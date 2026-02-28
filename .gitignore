@@ -1,0 +1,25 @@
+# ---- Large binary / data directories ----
+models/
+runs/
+data/
+datasets/
+baseline_*/
+
+# ---- Large files ----
+brushstroke_features.h5
+*.h5
+*.pth
+
+# ---- Python / Jupyter ----
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# ---- macOS ----
+.DS_Store
+._*
+
+# ---- IDE ----
+.vscode/
+.idea/
