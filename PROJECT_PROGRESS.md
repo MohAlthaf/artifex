@@ -31,18 +31,20 @@ It should be updated before or immediately after each important commit.
 - Baseline selected and frozen
 - Brushstroke-aware smoke test passed
 - Generator-only warm-start helper implemented and verified
-- **5-epoch warm-start verification run completed successfully**
-- Ready for real 50-epoch full brushstroke-aware training
+- 5-epoch warm-start verification run completed successfully
+- **50-epoch full training launched 2026-03-02, interrupted during epoch 32**
+- 31 complete epochs saved; last valid periodic checkpoint: epoch 30
+- Resume workflow implemented and verified
 
 ## Current risks
 
 - Must keep run folders isolated
-- Full 50-epoch run will take ~25 hours on M2 MPS
-- Val loss (~0.91) is higher than baseline (~0.30) due to additional brushstroke loss terms — this is expected and not a concern
+- Val loss (~0.93) is higher than baseline (~0.30) due to additional brushstroke loss terms — expected, different objective
+- Scheduler state (ReduceLROnPlateau) is not saved in checkpoints; patience counter resets on resume — tolerable since no LR reduction triggered in first 31 epochs
 
 ## Immediate next step
 
-Restart kernel, re-run setup, set epochs=50, launch real full brushstroke-aware training run
+Resume training from epoch 30 checkpoint, complete remaining 20 epochs (31–50)
 
 ---
 
@@ -301,6 +303,109 @@ Restart kernel, re-run setup, set epochs=50, launch real full brushstroke-aware 
 
 - Restart kernel, re-run setup cells, set CONFIG['epochs']=50, launch real full training
 - After completion: evaluate on test set vs frozen baseline
+
+---
+
+## [2026-03-02] 50-epoch full training launched — interrupted at epoch 32
+
+- **Branch:** `thesis-brushstroke-experiments`
+- **Commit:** `50eade7`
+- **Type:** experiment
+- **Status:** interrupted
+
+#### What changed
+
+- Launched clean 50-epoch full brushstroke-aware training run from warm-started baseline generator (epoch 46)
+- Fixed config snapshot bug: `CONFIG['epochs'] = 50` now set before `run_ablation()` so snapshot is correct
+- Training ran successfully through 31 complete epochs before kernel interruption during epoch 32
+
+#### Why this change was made
+
+- This is the core full brushstroke-aware experiment for the thesis
+
+#### Files touched
+
+- `artifex_FULLY_FIXED_M2_PATHS.ipynb` (cell 31 fixed for config snapshot ordering)
+
+#### Outputs / artifacts
+
+- `runs/full_20260302_070353/` — canonical full experiment folder
+- `runs/full_20260302_070353/checkpoints/checkpoint_epoch_{5,10,15,20,25,30}.pth` — all 276 MB, valid
+- `runs/full_20260302_070353/checkpoints/full_best.pth` — epoch 3, val_loss=0.905
+- `runs/full_20260302_070353/logs/config_snapshot.json` — correct (epochs=50, model_type=full)
+- `runs/full_20260302_070353/logs/training_history_live.json` — 31 epochs recorded, status=interrupted
+
+#### Results / observations
+
+- All 31 epochs completed cleanly with no NaN, no corruption
+- All periodic checkpoints are 276 MB (consistent, valid)
+- Train G loss: 0.63 at epoch 31 (steadily decreasing from 0.99)
+- Brushstroke losses all decreasing: direction 0.158→0.028, edge 0.137→0.117, histogram 0.041→0.018
+- Val total loss plateaued around 0.93 (expected, different objective than baseline)
+- best_val_loss = 0.905 at epoch 3 (early epochs had lower val loss before brushstroke losses dominated)
+- Config snapshot correctly records epochs=50, model_type=full, all lambdas active
+
+#### Risks / issues found
+
+- Kernel interrupted during epoch 32 — no checkpoint saved for epochs 31 or 32
+- Scheduler state (ReduceLROnPlateau) not saved in checkpoints — patience counter will reset on resume
+- full_best.pth is from epoch 3, which is early; later epochs may be better by brushstroke quality despite higher raw val loss
+
+#### Decision taken
+
+- Resume from `checkpoint_epoch_30.pth` (last valid periodic checkpoint)
+- Continue in the same `full_20260302_070353` run folder for thesis cleanliness
+- Do not restart from scratch — 31 epochs of valid training is too valuable to discard
+
+#### Next step
+
+- Implement safe resume workflow and continue training to epoch 50
+
+---
+
+## [2026-03-03] Resume workflow implemented for interrupted full training
+
+- **Branch:** `thesis-brushstroke-experiments`
+- **Commit:** TBD
+- **Type:** code / bugfix / experiment-management
+- **Status:** completed
+
+#### What changed
+
+- Fixed `train_full_model()` bug: `best_val_loss` now restored from `best_val_loss` key (was incorrectly using `val_loss`)
+- Added training history restore on resume: appends to existing 31-epoch history instead of starting empty
+- Added resume prep cell (cell 31): configures CONFIG to resume in the original `full_20260302_070353` folder
+- Added resume verification cell (cell 32): 12-point pre-flight checklist before resuming
+
+#### Why this change was made
+
+- Original resume path had a bug that would use `val_loss` (that epoch's val loss = 0.937) instead of `best_val_loss` (0.905), potentially overwriting `full_best.pth` with a worse model
+- Training history was not restored on resume, which would create a gap in the CSV/JSON logs
+- Needed a safe, verified path to continue the interrupted run
+
+#### Files touched
+
+- `artifex_FULLY_FIXED_M2_PATHS.ipynb` (cell 16: train_full_model fix; cells 31-32: new resume cells)
+- `PROJECT_PROGRESS.md`
+
+#### Outputs / artifacts
+
+- No new run outputs yet (resume not yet executed)
+
+#### Risks / issues found
+
+- Scheduler state not saved in checkpoints — ReduceLROnPlateau patience resets on resume (tolerable: patience=10, no LR reduction had triggered in 31 epochs)
+- Epoch 31 training completed but was not saved as a checkpoint (epoch 31 is between periodic saves at ep30 and ep35)
+
+#### Decision taken
+
+- Resume from epoch 30 checkpoint (the latest fully valid periodic checkpoint)
+- Continue in the same run folder (`full_20260302_070353`) — one experiment = one folder
+- Training history appended seamlessly (31 pre-existing + 19 new = 50 total epochs in final CSV/JSON)
+
+#### Next step
+
+- Restart kernel, run setup cells 2-16, skip cell 17, run cells 27/29/30, run cell 31 (resume prep), run cell 32 (resume verify), run cell 33 (training)
 
 ---
 
