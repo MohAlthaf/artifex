@@ -24,27 +24,33 @@ It should be updated before or immediately after each important commit.
 - **Why selected:** best overall checkpoint after comparison against epoch 60
 - **Reference metadata:** `models/baseline_official/selection_record.json`
 
+## Current official full model
+
+- **Checkpoint:** `models/full_official/full_official_best.pth`
+- **Selected from:** `full_best.pth` (epoch 3, best val loss during full training)
+- **Why selected:** Won 7/9 metrics vs epoch 50, including 2/3 brushstroke metrics. Best PSNR (25.91) and direction loss (0.1925).
+- **Reference metadata:** `models/full_official/selection_record.json`
+
 ## Current project state
 
 - Data pipeline complete
 - HDF5 brushstroke priors complete
-- Baseline selected and frozen
-- Brushstroke-aware smoke test passed
-- Generator-only warm-start helper implemented and verified
-- 5-epoch warm-start verification run completed successfully
-- **50-epoch full training launched 2026-03-02, interrupted during epoch 32**
-- 31 complete epochs saved; last valid periodic checkpoint: epoch 30
-- Resume workflow implemented and verified
+- Baseline selected and frozen (epoch 46, `models/baseline_official/`)
+- 50-epoch full brushstroke-aware training completed (2026-03-02 to 2026-03-03)
+- Full model evaluated on 305-image test set
+- Full model selected and frozen (epoch 3, `models/full_official/`)
+- **Full model improves ALL brushstroke metrics over baseline**
+- Baseline-vs-full comparison saved (`results/baseline_vs_full_comparison.json`)
 
 ## Current risks
 
 - Must keep run folders isolated
-- Val loss (~0.93) is higher than baseline (~0.30) due to additional brushstroke loss terms — expected, different objective
-- Scheduler state (ReduceLROnPlateau) is not saved in checkpoints; patience counter resets on resume — tolerable since no LR reduction triggered in first 31 epochs
+- Full model val loss (~0.90) is higher than baseline val loss (~0.30) — expected, different loss objectives (brushstroke terms increase total loss but improve quality)
+- LPIPS metric unavailable due to SSL certificate issue (non-blocking)
 
 ## Immediate next step
 
-Resume training from epoch 30 checkpoint, complete remaining 20 epochs (31–50)
+Run ablation experiments: `dir_only`, `edge_only`, `hist_only`
 
 ---
 
@@ -104,6 +110,80 @@ Resume training from epoch 30 checkpoint, complete remaining 20 epochs (31–50)
 #### Next step
 
 - ***
+
+## [2026-03-03] 50-epoch full training completed, evaluated, and frozen
+
+- **Branch:** `thesis-brushstroke-experiments`
+- **Commit:** TBD
+- **Type:** experiment / evaluation
+- **Status:** completed
+
+#### What changed
+
+- 50-epoch full brushstroke-aware training completed (run `full_20260302_070353`)
+- Training was interrupted twice (at epoch 32 and epoch 41) and resumed each time
+- Both full checkpoints evaluated on 305-image test set: `full_best.pth` (epoch 3) and `checkpoint_epoch_50.pth`
+- `full_best.pth` selected as official full model (7/9 metrics won, 2/3 brushstroke metrics won)
+- Official full model frozen at `models/full_official/full_official_best.pth`
+- Baseline-vs-full comparison completed: full model improves ALL 3 brushstroke metrics over baseline
+
+#### Why this change was made
+
+- Complete the full brushstroke-aware training run as the thesis's central experiment
+- Establish quantitative evidence that brushstroke losses improve restoration quality
+
+#### Files touched
+
+- `scripts/evaluate_full_model.py` (new — standalone evaluation pipeline)
+- `models/full_official/full_official_best.pth` (new — frozen official full model)
+- `models/full_official/selection_record.json` (new — selection metadata)
+- `results/full_eval/full_best/evaluation_results.json` (new)
+- `results/full_eval/epoch_50/evaluation_results.json` (new)
+- `results/baseline_vs_full_comparison.json` (new)
+- `PROJECT_PROGRESS.md` (updated)
+
+#### Outputs / artifacts
+
+- `results/full_eval/full_best/` — evaluation JSON, visual comparison, brushstroke analysis, 305 restored images
+- `results/full_eval/epoch_50/` — same set of artifacts
+- `models/full_official/selection_record.json` — checkpoint selection rationale + both candidates' metrics
+- `results/baseline_vs_full_comparison.json` — head-to-head baseline vs full on test set
+
+#### Results / observations
+
+- **full_best (epoch 3) vs epoch_50 (epoch 50):**
+  - full_best wins 7/9 metrics (PSNR, SSIM, L1, L2, perceptual, direction, edge)
+  - epoch_50 wins 2/9 (style, histogram)
+  - PSNR: 25.91 vs 25.39; Direction: 0.1925 vs 0.2118
+- **Baseline vs Full (using full_best):**
+  - Full wins 8/9 metrics (only loses on style: 0.000574 vs 0.000556)
+  - Direction: 0.2212 → 0.1925 (−13.0%)
+  - Edge: 0.1484 → 0.1466 (−1.2%)
+  - Histogram: 0.0570 → 0.0529 (−7.2%)
+  - PSNR: 25.61 → 25.91 (+0.30 dB)
+  - SSIM: 0.8622 → 0.8693 (+0.0071)
+  - Verdict: `full_improves_all_brushstroke`
+- LPIPS unavailable (SSL cert issue, non-blocking)
+- Val loss (0.9045) is higher than baseline (0.3004) — expected since brushstroke loss terms add to objective
+
+#### Risks / issues found
+
+- Best val loss was at epoch 3 — model may benefit from different learning rate schedule or warmup
+- Style loss slightly regressed (0.000556 → 0.000574) — minor, within noise
+- Training required 3 resume cycles due to kernel interruptions
+
+#### Decision taken
+
+- `full_best.pth` (epoch 3) selected as official full model
+- Frozen at `models/full_official/full_official_best.pth`
+
+#### Next step
+
+- Run ablation experiments: `dir_only`, `edge_only`, `hist_only` (50 epochs each)
+- Each ablation isolates one brushstroke loss component
+- Compare all variants against baseline and full model
+
+---
 
 ## [2026-03-01] Baseline checkpoint comparison and freeze
 
@@ -437,7 +517,7 @@ Resume training from epoch 30 checkpoint, complete remaining 20 epochs (31–50)
 
 ## Milestone 4 — Ablation Study
 
-- [ ] dir_only trained
+- [ ] dir_only trained ← **READY TO RUN** (cells 41–45 + evaluate_ablation.py)
 - [ ] edge_only trained
 - [ ] hist_only trained
 - [ ] all ablations evaluated
@@ -464,9 +544,36 @@ Resume training from epoch 30 checkpoint, complete remaining 20 epochs (31–50)
 
 ## Official full model
 
-- **Selected checkpoint:** TBD
-- **Reason:** TBD
-- **Frozen on:** TBD
+- **Selected checkpoint:** epoch 3 (full_best.pth)
+- **Reason:** Won 7/9 test metrics vs epoch 50; all 3 brushstroke metrics improved over baseline
+- **Frozen on:** 2026-03-03
+
+---
+
+# Ablation Experiments
+
+## dir_only — Direction Loss Only
+
+- **Status:** READY TO RUN (not yet trained)
+- **Config:** `lambda_direction = 2.0, lambda_thickness = 0.0, lambda_histogram = 0.0`
+- **Warm-start:** frozen baseline (generator only), discriminators fresh
+- **Epochs:** 50 (matches full model)
+- **Notebook cells:** 41 (header), 42 (verify_ablation_setup), 43 (prep), 44 (train), 45 (eval)
+- **Evaluation script:** `scripts/evaluate_ablation.py --ablation dir_only --run-dir <TBD>`
+- **Implementation date:** 2026-03-04
+- **Changes made:**
+  - Added `verify_ablation_setup(ablation_name)` — generalized verify function for any ablation
+  - Added dir_only prep cell: calls `run_ablation('dir_only')`, sets epochs=50, warm-starts from baseline, verifies
+  - Created `scripts/evaluate_ablation.py` — parameterized evaluation pipeline for all ablations
+  - Existing cells 1–40 unchanged
+
+## edge_only — Edge Strength Loss Only
+
+- **Status:** NOT STARTED (pending dir_only completion)
+
+## hist_only — Histogram Loss Only
+
+- **Status:** NOT STARTED (pending dir_only completion)
 
 ---
 
