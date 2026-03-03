@@ -1,0 +1,97 @@
+{
+  "timestamp": "2026-03-03T22:05:49.045474",
+  "baseline": {
+    "checkpoint": "/Users/althafali/Downloads/ARTIFEX/implementation/models/baseline_official/baseline_official_best.pth",
+    "evaluation_json": "/Users/althafali/Downloads/ARTIFEX/implementation/results/baseline_ep46/evaluation_results.json",
+    "epoch": 46,
+    "model_type": "baseline"
+  },
+  "full": {
+    "checkpoint": "/Users/althafali/Downloads/ARTIFEX/implementation/models/full_official/full_official_best.pth",
+    "evaluation_json": "/Users/althafali/Downloads/ARTIFEX/implementation/results/full_eval/full_best/evaluation_results.json",
+    "epoch": 3,
+    "model_type": "full",
+    "selected_from": "full_best"
+  },
+  "comparison": [
+    {
+      "metric": "psnr",
+      "baseline": 25.612834144113705,
+      "full": 25.908441462068197,
+      "delta": 0.2956073179544916,
+      "winner": "full"
+    },
+    {
+      "metric": "ssim",
+      "baseline": 0.8621782064437866,
+      "full": 0.8693059086799622,
+      "delta": 0.007127702236175537,
+      "winner": "full"
+    },
+    {
+      "metric": "lpips",
+      "baseline": null,
+      "full": null,
+      "delta": null,
+      "winner": "N/A"
+    },
+    {
+      "metric": "l1",
+      "baseline": 0.01846293559389525,
+      "full": 0.017834927170674822,
+      "delta": -0.0006280084232204268,
+      "winner": "full"
+    },
+    {
+      "metric": "l2",
+      "baseline": 0.004202584120574728,
+      "full": 0.0039703322226204525,
+      "delta": -0.00023225189795427533,
+      "winner": "full"
+    },
+    {
+      "metric": "perceptual",
+      "baseline": 0.7074393486390348,
+      "full": 0.7041646267546982,
+      "delta": -0.00327472188433664,
+      "winner": "full"
+    },
+    {
+      "metric": "style",
+      "baseline": 0.0005560256079885132,
+      "full": 0.0005735724393877613,
+      "delta": 1.754683139924807e-05,
+      "winner": "baseline"
+    },
+    {
+      "metric": "direction",
+      "baseline": 0.22119990413794752,
+      "full": 0.19247829933635524,
+      "delta": -0.028721604801592276,
+      "winner": "full"
+    },
+    {
+      "metric": "edge_strength",
+      "baseline": 0.14842664738658998,
+      "full": 0.14662633208466358,
+      "delta": -0.0018003153019263973,
+      "winner": "full"
+    },
+    {
+      "metric": "histogram",
+      "baseline": 0.05695939118989178,
+      "full": 0.052870059077490546,
+      "delta": -0.004089332112401235,
+      "winner": "full"
+    }
+  ],
+  "wins": {
+    "baseline": 1,
+    "full": 8
+  },
+  "verdict": "full_improves_all_brushstroke",
+  "brushstroke_improvement": {
+    "improved": 3,
+    "total": 3
+  }
+}
