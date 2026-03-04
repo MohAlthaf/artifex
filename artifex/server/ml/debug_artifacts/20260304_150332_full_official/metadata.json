@@ -1,0 +1,14 @@
+{
+  "model_name": "full_official",
+  "checkpoint_path": "/Users/althafali/Downloads/ARTIFEX/implementation/models/full_official/full_official_best.pth",
+  "original_size_WxH": [
+    512,
+    512
+  ],
+  "inference_size": "512x512",
+  "mask_coverage_pct": 27.79,
+  "output_range": [
+    1.6574518667766824e-05,
+    0.9998642206192017
+  ]
+}
