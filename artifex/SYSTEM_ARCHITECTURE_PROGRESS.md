@@ -4,6 +4,76 @@ Changelog and milestone tracker for the ARTIFEX thesis demo system.
 
 ---
 
+## v3 — Next.js Migration + Per-Upload Evaluation (4 March 2026)
+
+### Summary
+
+Complete frontend migration from React+Vite+Express to **Next.js App Router + Tailwind CSS**, with the Express proxy layer removed entirely. Flask ML backend now serves the frontend directly via CORS. Major product change: single thesis-demo page with per-upload evaluation.
+
+### Architecture Change
+
+**Before (v2):** React 19 + Vite (5173) → Express proxy (3001) → Flask ML (5001)
+**After (v3):** Next.js 15 App Router (3000) → Flask ML (5001) directly
+
+### Key Changes
+
+| Change | File(s) | Details |
+|---|---|---|
+| New Next.js app | `client-next/` | App Router, Tailwind CSS, single page concept |
+| Single thesis demo page | `client-next/app/page.jsx` | Replaces two-tab SPA (Live Restore + Benchmark Explorer) |
+| Per-upload evaluation endpoint | `server/ml/app.py` | `POST /api/restore-with-eval` — accepts optional ground_truth file |
+| Metric computation module | `server/ml/metrics.py` | PSNR, SSIM, L1, L2, Perceptual, Style (VGG-based) |
+| Express proxy removed | `start.sh` | Only 2 servers now: Flask (5001) + Next.js (3000) |
+| Tailwind CSS | `client-next/app/globals.css` | Premium dark theme with Van Gogh gold accents |
+| Upload with GT support | `client-next/components/UploadZone.jsx` | 3 upload slots: damaged + mask + ground truth |
+| Honest metric policy | Frontend + Backend | Metrics ONLY when GT provided |
+| Benchmark evidence section | `client-next/components/BenchmarkEvidence.jsx` | Comparison table + sample browser, same page |
+
+### Metric Honesty Policy
+
+| Scenario | Behaviour |
+|---|---|
+| No ground truth | Restoration runs. No per-upload metrics shown. |
+| With ground truth | PSNR, SSIM, L1, L2, Perceptual, Style computed per model vs GT |
+| Benchmark section | Official test-set averages from saved JSONs (always visible) |
+
+### Files Created
+
+| File | Purpose |
+|---|---|
+| `client-next/package.json` | Next.js 15 + React 19 + Tailwind CSS |
+| `client-next/next.config.mjs` | Flask backend URL config |
+| `client-next/app/layout.jsx` | Root layout with Google Fonts |
+| `client-next/app/page.jsx` | Single thesis demo page |
+| `client-next/app/globals.css` | Tailwind v4 + Van Gogh theme |
+| `client-next/lib/api.js` | API client (direct Flask calls) |
+| `client-next/components/UploadZone.jsx` | 3-slot upload (damaged + mask + GT) |
+| `client-next/components/ModelResultCard.jsx` | Per-model result card |
+| `client-next/components/BeforeAfterSlider.jsx` | Drag slider comparison |
+| `client-next/components/MetricBadge.jsx` | Metric display badge |
+| `client-next/components/BenchmarkEvidence.jsx` | Benchmark table + sample browser |
+| `server/ml/metrics.py` | Per-upload metric computation |
+
+### Files Modified
+
+| File | Change |
+|---|---|
+| `server/ml/app.py` | Added `POST /api/restore-with-eval` endpoint, torch import, metrics import |
+| `start.sh` | Removed Express, launches Flask + Next.js |
+| `README.md` | Rewritten for v3 architecture |
+| `SYSTEM_ARCHITECTURE_PROGRESS.md` | This section |
+
+### Legacy Preserved
+
+| File/Directory | Status |
+|---|---|
+| `client/` | Preserved — v2 React+Vite frontend |
+| `server/server.js` | Preserved — v2 Express proxy |
+| `server/ml/app_legacy.py` | Preserved — v1 prototype |
+| `server/ml/model_legacy.py` | Preserved — v1 architecture |
+
+---
+
 ## v2.1 — Inference Pipeline Fix (4 March 2026)
 
 ### Summary

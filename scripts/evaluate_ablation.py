@@ -275,7 +275,8 @@ def evaluate_checkpoint(label, ckpt_path, out_dir, test_dataset, test_loader,
 
             if save_restored:
                 from torchvision.utils import save_image
-                save_image(comp[0], os.path.join(restored_dir, f'{img_name}.png'))
+                # img_name already has .png extension — don't double it
+                save_image(comp[0], os.path.join(restored_dir, img_name))
 
     # Averages
     avg_metrics = {}

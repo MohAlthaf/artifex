@@ -96,7 +96,7 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
         "ablation_losses": ["direction"],
         "checkpoint_path": os.path.join(
             THESIS_ROOT, "models", "dir_only_official",
-            "dir_only_official_best.pth",
+            "dir_only_best.pth",
         ),
         "selection_record": None,
         "eval_json": None,
@@ -110,7 +110,7 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
         "ablation_losses": ["edge_strength"],
         "checkpoint_path": os.path.join(
             THESIS_ROOT, "models", "edge_only_official",
-            "edge_only_official_best.pth",
+            "edge_only_best.pth",
         ),
         "selection_record": None,
         "eval_json": None,
@@ -124,7 +124,7 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
         "ablation_losses": ["histogram"],
         "checkpoint_path": os.path.join(
             THESIS_ROOT, "models", "hist_only_official",
-            "hist_only_official_best.pth",
+            "hist_only_best.pth",
         ),
         "selection_record": None,
         "eval_json": None,

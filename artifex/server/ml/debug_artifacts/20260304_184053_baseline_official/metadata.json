@@ -1,0 +1,14 @@
+{
+  "model_name": "baseline_official",
+  "checkpoint_path": "/Users/althafali/Downloads/ARTIFEX/implementation/models/baseline_official/baseline_official_best.pth",
+  "original_size_WxH": [
+    512,
+    512
+  ],
+  "inference_size": "512x512",
+  "mask_coverage_pct": 10.99,
+  "output_range": [
+    0.001016182010062039,
+    0.9998958110809326
+  ]
+}

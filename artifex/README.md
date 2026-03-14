@@ -1,7 +1,7 @@
 # ARTIFEX — Van Gogh Art Restoration Demo
 
-> **Thesis Project Demo**
-> Interactive web application for exploring the SGRGAN-based painting restoration system trained for the thesis. Upload a damaged Van Gogh painting and run it through all available official thesis checkpoints simultaneously, or browse the 305-image official test-set benchmark results.
+> **Thesis Project Demo (v3)**
+> Single-page research prototype: upload a damaged Van Gogh painting + damage mask + optional clean ground truth. Run it through all available official SGRGAN thesis models. See real per-upload metrics ONLY when ground truth is provided — no fake metrics, ever. Browse official benchmark evidence (305-image test set).
 
 ---
 
@@ -9,33 +9,46 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                       Browser (port 5173)                       │
-│              React 19 + Vite — Two-tab SPA                      │
-│   ┌──────────────────────┐  ┌──────────────────────────────┐   │
-│   │  ✨ Live Restore      │  │  📊 Benchmark Explorer       │   │
-│   │  Upload → all-model  │  │  Browse 305-image test set   │   │
-│   │  inference side-by-  │  │  with ground truth + metrics │   │
-│   │  side with metrics   │  │  from saved evaluation JSONs │   │
-│   └──────────────────────┘  └──────────────────────────────┘   │
+│                    Browser (port 3000)                           │
+│              Next.js 15 — App Router, Tailwind CSS              │
+│                                                                  │
+│   Single thesis demo page:                                       │
+│     1. Upload: damaged image + mask + optional ground truth      │
+│     2. → All-model inference (all available official models)     │
+│     3. → Per-upload metrics (ONLY when GT provided)              │
+│     4. Official benchmark evidence section (n=305)               │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │ HTTP
-┌───────────────────────────▼─────────────────────────────────────┐
-│                  Express API Server (port 3001)                  │
-│              Node.js — Proxy + static serving                    │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │ HTTP (localhost)
+                            │ HTTP (direct, no Express proxy)
 ┌───────────────────────────▼─────────────────────────────────────┐
 │                Flask ML Service (port 5001)                      │
 │  canonical_inference.py — SGRGANGenerator (exact thesis arch)    │
 │  model_registry.py      — Dynamic checkpoint discovery           │
-│  app.py                 — Flask endpoints                        │
+│  metrics.py             — Per-upload metric computation           │
+│  app.py                 — Flask endpoints + CORS                  │
 │                                                                  │
 │  Models loaded at startup:                                       │
-│    ✅ baseline_official  (models/baseline_official/)             │
+│    ✅ baseline_official   (models/baseline_official/)             │
 │    ✅ full_official       (models/full_official/)                 │
 │    ❌ dir/edge/hist ablations — not yet trained                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### Key Design Decision: No Express Proxy
+
+v3 removes the Express proxy layer. Next.js calls Flask directly via CORS.
+This simplifies the stack and reduces failure modes.
+
+---
+
+## Metric Honesty Policy
+
+| Scenario                              | What is shown                                                                                                             |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Upload: damaged + mask (no GT)        | Restoration runs. **No per-upload metrics** — because computing PSNR/SSIM without ground truth would be misleading.       |
+| Upload: damaged + mask + ground truth | Restoration runs. **Real per-upload metrics** (PSNR, SSIM, L1, L2, Perceptual, Style) computed against YOUR ground truth. |
+| Benchmark section                     | **Official test-set averages** from saved evaluation JSONs (n=305). Always visible.                                       |
+
+Brushstroke-specific metrics (direction, edge strength, histogram) require pre-extracted feature maps and are available only for official benchmark images.
 
 ---
 
@@ -49,25 +62,32 @@
 | `edge_only_official` | ❌ Not yet trained | —                                                             | —                                                     |
 | `hist_only_official` | ❌ Not yet trained | —                                                             | —                                                     |
 
-> **Note:** The `model/` directory contains old prototype checkpoints (247 MB each, no skip connections). These are **not used** by this app — they are preserved for audit purposes only.
-
 ---
 
 ## Setup
 
 ### Prerequisites
 
-- Python 3.10+ with: `torch torchvision flask flask-cors numpy Pillow h5py`
+- Python 3.10+ with: `torch torchvision flask flask-cors numpy Pillow`
 - Node.js 18+ and npm
 
 ### Install dependencies (first time only)
 
 ```bash
-pip install torch torchvision flask flask-cors numpy Pillow h5py
+pip install torch torchvision flask flask-cors numpy Pillow
 
-cd artifex/server && npm install
-cd artifex/client && npm install
+cd artifex/client-next && npm install
 ```
+
+### Git hook setup (one-time, per clone)
+
+Enable the repo-local pre-commit hook that auto-updates tracking docs on every commit:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This will run `scripts/update_task_tracker.py` and `scripts/update_devlog_from_staged_diff.py` before each commit, then stage the updated `docs/IMPLEMENTATION_TASK_TRACKER.md`, `docs/WORK_DONE_SNAPSHOT.md`, and `docs/DEVLOG.md`.
 
 ### Run
 
@@ -77,7 +97,35 @@ chmod +x start.sh
 ./start.sh
 ```
 
-Open **http://localhost:5173**
+Open **http://localhost:3000**
+
+---
+
+## API Endpoints
+
+### Primary (v3)
+
+| Method | Endpoint                 | Description                                                                 |
+| ------ | ------------------------ | --------------------------------------------------------------------------- |
+| `POST` | `/api/restore-with-eval` | Upload image + mask + optional GT → all-model results + conditional metrics |
+| `GET`  | `/api/models`            | Full model registry                                                         |
+| `GET`  | `/health`                | Health check                                                                |
+
+### Benchmark
+
+| Method | Endpoint                    | Description                 |
+| ------ | --------------------------- | --------------------------- |
+| `GET`  | `/api/benchmark/models`     | Models with evaluation data |
+| `GET`  | `/api/benchmark/samples`    | Paginated sample list       |
+| `GET`  | `/api/benchmark/sample/:id` | Single sample detail        |
+| `GET`  | `/api/benchmark/comparison` | Baseline vs Full comparison |
+
+### Legacy (preserved)
+
+| Method | Endpoint           | Description                       |
+| ------ | ------------------ | --------------------------------- |
+| `POST` | `/api/restore-all` | v2 all-model restore (no GT eval) |
+| `POST` | `/predict`         | v1 single-model restore           |
 
 If `python3` is not on PATH (e.g. pyenv):
 

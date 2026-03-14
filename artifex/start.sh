@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # =============================================================================
-# start.sh — ARTIFEX Demo Startup Script (v2)
+# start.sh — ARTIFEX Demo Startup Script (v3)
 # =============================================================================
-# Starts all three servers in the correct order:
+# Starts both servers:
 #   1. Flask ML Service   (port 5001)  — loads official thesis checkpoints
-#   2. Express API        (port 3001)  — proxies to Flask
-#   3. React Frontend     (port 5173)  — Vite dev server
+#   2. Next.js Frontend   (port 3000)  — App Router, talks to Flask directly
+#
+# Express proxy is NO LONGER NEEDED — Next.js calls Flask via CORS.
 #
 # Requirements:
-#   - Python 3.10+ with torch, flask, flask-cors, numpy, Pillow installed
+#   - Python 3.10+ with torch, flask, flask-cors, numpy, Pillow, torchvision
 #     (activate your pyenv/conda environment before running, or set PYTHON= below)
 #   - Node.js 18+ with npm
-#   - Run `npm install` in server/ and client/ before first use
+#   - Run `npm install` in client-next/ before first use
 #
 # Usage:
 #   ./start.sh                          # uses python3 on PATH
 #   PYTHON=python3.10 ./start.sh        # specify Python explicitly
-#   PYTHON=~/.pyenv/versions/3.10.9/bin/python3 ./start.sh
 # =============================================================================
 
 set -e
@@ -50,43 +50,36 @@ echo -e "${BLUE}Python: ${PYTHON_BIN}${NC}"
 echo ""
 
 # Start Flask ML Server
-echo -e "${BLUE}[1/3] Starting Flask ML Service (port 5001)...${NC}"
+echo -e "${BLUE}[1/2] Starting Flask ML Service (port 5001)...${NC}"
 echo "      Loading official thesis checkpoints — expect 30-60s on first start"
 cd "$PROJECT_DIR/server/ml"
 "$PYTHON_BIN" app.py &
 ML_PID=$!
-sleep 5   # give Flask time to initialise models before Express connects
+sleep 5   # give Flask time to initialise models
 
-# Start Express API Server
-echo -e "${BLUE}[2/3] Starting Express API Server (port 3001)...${NC}"
-cd "$PROJECT_DIR/server"
+# Start Next.js Frontend
+echo -e "${BLUE}[2/2] Starting Next.js Frontend (port 3000)...${NC}"
+cd "$PROJECT_DIR/client-next"
 npm run dev &
-EXPRESS_PID=$!
-sleep 2
-
-# Start React Frontend
-echo -e "${BLUE}[3/3] Starting React Frontend (port 5173)...${NC}"
-cd "$PROJECT_DIR/client"
-npm run dev &
-REACT_PID=$!
+NEXT_PID=$!
 
 echo ""
 echo -e "${GREEN}=========================================="
 echo " All servers started!"
 echo ""
 echo "  Flask ML Service : http://localhost:5001/health"
-echo "  Express API      : http://localhost:3001/api/health"
-echo "  React Frontend   : http://localhost:5173"
+echo "  Next.js Frontend : http://localhost:3000"
 echo ""
-echo "  Open http://localhost:5173 in your browser."
+echo "  Open http://localhost:3000 in your browser."
 echo ""
-echo "  Tabs:"
-echo "    ✨ Live Restore      — upload an image → all-model inference"
-echo "    📊 Benchmark Explorer — official test-set results (n=305)"
+echo "  Single-page thesis demo:"
+echo "    Upload damaged image + mask + optional clean ground truth"
+echo "    → All-model inference with per-upload metrics (when GT provided)"
+echo "    → Official benchmark evidence (n=305 test images)"
 echo ""
 echo "  Press Ctrl+C to stop all servers."
 echo -e "==========================================${NC}"
 
 # Cleanup on exit
-trap "echo ''; echo 'Stopping all servers…'; kill \$ML_PID \$EXPRESS_PID \$REACT_PID 2>/dev/null; exit 0" INT TERM
+trap "echo ''; echo 'Stopping all servers…'; kill \$ML_PID \$NEXT_PID 2>/dev/null; exit 0" INT TERM
 wait
