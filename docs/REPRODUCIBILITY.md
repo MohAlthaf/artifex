@@ -14,6 +14,7 @@ pip install -r requirements.txt
 ## Data
 
 Place the preprocessed dataset at `data/processed/` with structure:
+
 ```
 data/processed/
   train/{original,masked,masks}/
@@ -57,20 +58,27 @@ artifex_FULLY_FIXED_M2_PATHS.ipynb
 
 Cell 18 uses `lpips.LPIPS(net='vgg')` instead of the more common `net='alex'`. This is because the AlexNet weights (~233 MB) are not cached locally and the download consistently times out. VGG16 weights (~528 MB) are already present at `~/.cache/torch/hub/checkpoints/vgg16-397923af.pth`.
 
+The sanity check uses a 64×64 zero-tensor (VGG-LPIPS requires input ≥ 16×16 due to 5 pooling layers). An earlier version used 8×8, which silently crashed and set `LPIPS_AVAILABLE = False`, producing NaN everywhere.
+
 **Important:** VGG-based LPIPS values are on a different numerical scale than AlexNet-based values. All comparisons in this project use the VGG backbone consistently.
 
 ## Frozen Official Artifacts
 
 These checkpoints must **not** be modified:
 
-| Artifact | Path | Notes |
-|----------|------|-------|
-| Baseline official | `models/baseline_official/baseline_official_best.pth` | Epoch 46, val_loss=0.300352 |
-| Full official | `models/full_official/full_official_best.pth` | Epoch 3, metric wins 7/10 |
-| Baseline eval (original) | `results/baseline_ep46/evaluation_results.json` | LPIPS=NaN (AlexNet) |
-| Full eval (original) | `results/full_eval/full_best/evaluation_results.json` | LPIPS=NaN (AlexNet) |
-| Baseline eval (v2) | `results/baseline_ep46_v2/evaluation_results.json` | LPIPS valid (VGG) |
-| Full eval (v2) | `results/full_eval_v2/evaluation_results.json` | LPIPS valid (VGG) |
+| Artifact                 | Path                                                                     | Notes                       |
+| ------------------------ | ------------------------------------------------------------------------ | --------------------------- |
+| Baseline official        | `models/baseline_official/baseline_official_best.pth`                    | Epoch 46, val_loss=0.300352 |
+| Full official            | `models/full_official/full_official_best.pth`                            | Epoch 3, metric wins 7/10   |
+| dir_only 15-ep official  | `models/dir_only_15ep_official/dir_only_15ep_official_best.pth`          | Epoch 15 (resumed from 5)   |
+| edge_only 15-ep official | `models/edge_only_15ep_official/edge_only_15ep_official_best.pth`        | Epoch 5, baseline warm-start|
+| hist_only 15-ep official | `models/hist_only_15ep_official/hist_only_15ep_official_best.pth`        | Epoch 5, baseline warm-start|
+| Baseline eval (original) | `results/baseline_ep46/evaluation_results.json`                          | LPIPS=NaN (AlexNet)         |
+| Full eval (original)     | `results/full_eval/full_best/evaluation_results.json`                    | LPIPS=NaN (AlexNet)         |
+| Baseline eval (v2)       | `results/baseline_ep46_v2/evaluation_results.json`                       | LPIPS valid (VGG)           |
+| Full eval (v2)           | `results/full_eval_v2/evaluation_results.json`                           | LPIPS valid (VGG)           |
+| 15-ep comparison         | `results/ablation_15ep_comparison.json`                                  | All 5 models, LPIPS valid   |
+| 15-ep CSV table          | `results/official_tables/final_metrics_15ep_ablation.csv`                | 6 rows, all metrics         |
 
 ## Ablation Naming Convention
 

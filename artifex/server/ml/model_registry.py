@@ -63,7 +63,7 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
             THESIS_ROOT, "models", "baseline_official", "selection_record.json"
         ),
         "eval_json": os.path.join(
-            THESIS_ROOT, "results", "baseline_ep46", "evaluation_results.json"
+            THESIS_ROOT, "results", "baseline_ep46_v2", "evaluation_results.json"
         ),
         "restored_images_dir": None,   # Not pre-computed
         "order": 1,
@@ -81,7 +81,7 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
             THESIS_ROOT, "models", "full_official", "selection_record.json"
         ),
         "eval_json": os.path.join(
-            THESIS_ROOT, "results", "full_eval", "full_best",
+            THESIS_ROOT, "results", "full_eval_v2",
             "evaluation_results.json",
         ),
         "restored_images_dir": os.path.join(
@@ -92,42 +92,56 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
     "dir_only_official": {
         "display_name":   "Direction-Only SGRGAN",
         "description":    "Ablation — direction loss only (λ_direction=2.0). "
-                          "Training not yet complete.",
+                          "15-epoch short suite; best at epoch 15.",
         "ablation_losses": ["direction"],
         "checkpoint_path": os.path.join(
-            THESIS_ROOT, "models", "dir_only_official",
-            "dir_only_best.pth",
+            THESIS_ROOT, "models", "dir_only_15ep_official",
+            "dir_only_15ep_official_best.pth",
         ),
-        "selection_record": None,
-        "eval_json": None,
+        "selection_record": os.path.join(
+            THESIS_ROOT, "models", "dir_only_15ep_official", "selection_record.json"
+        ),
+        "eval_json": os.path.join(
+            THESIS_ROOT, "results", "ablation_15ep_comparison.json",
+            
+        ),
+        # /Users/althafali/Downloads/ARTIFEX/implementation/results/ablation_15ep_comparison.json
         "restored_images_dir": None,
         "order": 3,
     },
     "edge_only_official": {
         "display_name":   "Edge-Only SGRGAN",
-        "description":    "Ablation — edge-strength loss only. "
-                          "Training not yet started.",
+        "description":    "Ablation — edge-strength loss only (λ_edge=2.0). "
+                          "15-epoch short suite; best at epoch 5.",
         "ablation_losses": ["edge_strength"],
         "checkpoint_path": os.path.join(
-            THESIS_ROOT, "models", "edge_only_official",
-            "edge_only_best.pth",
+            THESIS_ROOT, "models", "edge_only_15ep_official",
+            "edge_only_15ep_official_best.pth",
         ),
-        "selection_record": None,
-        "eval_json": None,
+        "selection_record": os.path.join(
+            THESIS_ROOT, "models", "edge_only_15ep_official", "selection_record.json"
+        ),
+        "eval_json": os.path.join(
+            THESIS_ROOT, "results", "ablation_15ep_comparison.json",
+        ),
         "restored_images_dir": None,
         "order": 4,
     },
     "hist_only_official": {
         "display_name":   "Histogram-Only SGRGAN",
-        "description":    "Ablation — histogram loss only. "
-                          "Training not yet started.",
+        "description":    "Ablation — histogram loss only (λ_hist=2.0). "
+                          "15-epoch short suite; best at epoch 5.",
         "ablation_losses": ["histogram"],
         "checkpoint_path": os.path.join(
-            THESIS_ROOT, "models", "hist_only_official",
-            "hist_only_best.pth",
+            THESIS_ROOT, "models", "hist_only_15ep_official",
+            "hist_only_15ep_official_best.pth",
         ),
-        "selection_record": None,
-        "eval_json": None,
+        "selection_record": os.path.join(
+            THESIS_ROOT, "models", "hist_only_15ep_official", "selection_record.json"
+        ),
+        "eval_json": os.path.join(
+            THESIS_ROOT, "results", "ablation_15ep_comparison.json",
+        ),
         "restored_images_dir": None,
         "order": 5,
     },
@@ -144,6 +158,7 @@ class EvalSummary:
     num_images: int = 0
     avg_psnr: Optional[float] = None
     avg_ssim: Optional[float] = None
+    avg_lpips: Optional[float] = None
     avg_l1: Optional[float] = None
     avg_l2: Optional[float] = None
     avg_direction: Optional[float] = None

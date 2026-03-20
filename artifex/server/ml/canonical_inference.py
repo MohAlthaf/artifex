@@ -38,7 +38,14 @@ from PIL import Image
 # ---------------------------------------------------------------------------
 
 def select_device() -> torch.device:
-    """Choose CPU even on Apple Silicon to avoid MPS attention buffer OOM."""
+    """Choose the best available device for inference.
+
+    CUDA is preferred when available.  On Apple Silicon Macs, MPS is
+    intentionally **not** used because the bi-level routing attention
+    in BiSCCFormer exceeds the MPS intermediate-buffer size limit,
+    causing OOM at 512x512 resolution.  CPU inference takes ~2-4s per
+    image on an M2, which is acceptable for the Flask serving path.
+    """
     if torch.cuda.is_available():
         return torch.device("cuda")
     # MPS has known attention buffer OOM issues with this architecture

@@ -130,7 +130,7 @@ def _load_vgg(device: torch.device):
 
 
 def _extract_vgg_features(
-    vgg: torch.nn.Module, x: torch.Tensor, layers: Tuple[int, ...] = (3, 8, 17, 26, 35)
+    vgg: torch.nn.Module, x: torch.Tensor, layers: Tuple[int, ...] = (1, 6, 11, 20, 29)
 ) -> list:
     """Extract features from specified VGG layers."""
     features = []

@@ -1,0 +1,14 @@
+{
+  "model_name": "edge_only_official",
+  "checkpoint_path": "/Users/althafali/Downloads/ARTIFEX/implementation/models/edge_only_official/edge_only_best.pth",
+  "original_size_WxH": [
+    512,
+    512
+  ],
+  "inference_size": "512x512",
+  "mask_coverage_pct": 22.72,
+  "output_range": [
+    0.00017354231385979801,
+    0.9999158382415771
+  ]
+}
