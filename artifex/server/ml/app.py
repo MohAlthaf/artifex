@@ -1,20 +1,9 @@
 """
-app.py — ARTIFEX ML Service (v2)
-==================================
-Flask server providing:
-  - Model discovery  (which official thesis checkpoints are available)
-  - Live restoration (run all/one available models on an uploaded image)
-  - Benchmark mode   (serve pre-computed benchmark images + saved metrics)
+app.py — ARTIFEX ML Service
 
-Runs on port 5001.  Called by the Express API on port 3001.
-
-Architecture notes:
-  - Loads ONLY officially frozen thesis checkpoints (baseline_official, full_official, …).
-  - Old prototype checkpoints in artifex/model/ are NOT used.
-  - Uses canonical_inference.py for architecture — exactly matches official checkpoints.
-  - Device forced to CPU to avoid MPS MultiheadAttention OOM on Apple Silicon.
-  - Benchmark metrics are served from saved evaluation JSONs — never computed
-    on-the-fly for uploaded images (that would be dishonest without ground truth).
+Flask server (port 5001) for model discovery, live restoration,
+and benchmark image/metric serving. Loads only official thesis
+checkpoints; forces CPU to avoid MPS OOM on Apple Silicon.
 """
 
 from __future__ import annotations
@@ -32,7 +21,7 @@ from flask import Flask, abort, jsonify, request, send_file
 from flask_cors import CORS
 
 from canonical_inference import (
-    SGRGANGenerator,
+    ArtifexGenerator,
     load_generator,
     run_inference,
     select_device,
@@ -67,8 +56,8 @@ print(f"[ARTIFEX] Using device: {DEVICE}")
 # Model registry: {model_id: ModelInfo}
 _registry: Dict[str, ModelInfo] = {}
 
-# Loaded generators: {model_id: SGRGANGenerator}  (only available models loaded)
-_generators: Dict[str, SGRGANGenerator] = {}
+# Loaded generators (only available models)
+_generators: Dict[str, ArtifexGenerator] = {}
 _generators_lock = threading.Lock()
 
 # Benchmark per-image metrics cache: {model_id: {image_name: {metric: value}}}
@@ -176,16 +165,31 @@ def health():
     })
 
 
+@app.route("/info")
+def info():
+    """System info and version endpoint for thesis demo."""
+    return jsonify({
+        "system": "ARTIFEX ML Service",
+        "version": "2.0",
+        "architecture": "Flask + PyTorch (CPU inference)",
+        "model_architecture": "ArtifexGenerator (dual-stream: BiSCCFormer + FocalModulation, attention fusion, U-Net decoder)",
+        "input_channels": 4,
+        "input_size": "512x512",
+        "device": str(DEVICE),
+        "available_models": list(_generators.keys()),
+        "total_registered_models": len(_registry),
+        "benchmark_samples": len(_benchmark_samples),
+        "official_eval_source": "results/baseline_ep46_v2 and results/full_eval_v2",
+    })
+
+
 # ---------------------------
 # Model discovery
 # ---------------------------
 
 @app.route("/api/models")
 def list_models():
-    """
-    GET /api/models
-    Returns the full registry with availability, metadata and eval summaries.
-    """
+    """Full registry with availability, metadata, and eval summaries."""
     return jsonify({
         "models": {mid: info.to_dict() for mid, info in _registry.items()},
         "available_model_ids": get_available_model_ids(_registry),
@@ -198,29 +202,7 @@ def list_models():
 
 @app.route("/api/restore-all", methods=["POST"])
 def restore_all():
-    """
-    POST /api/restore-all
-    Form-data: image (file), mask (file, optional)
-
-    Runs inference through ALL available loaded models.
-
-    Returns JSON:
-    {
-      "results": [
-        {
-          "model_id": "baseline_official",
-          "display_name": "...",
-          "available": true,
-          "restored_image_b64": "data:image/png;base64,...",
-          "error": null,
-          "official_metrics_note": "Metrics shown are official test-set averages ...",
-          "official_eval_summary": { ... }
-        },
-        ...
-      ],
-      "metric_disclaimer": "..."
-    }
-    """
+    """Run inference through all available models. Form-data: image, mask (optional)."""
     if "image" not in request.files:
         return jsonify({"error": "No image provided"}), 400
 
@@ -298,12 +280,7 @@ def restore_all():
 
 @app.route("/api/restore-one", methods=["POST"])
 def restore_one():
-    """
-    POST /api/restore-one
-    Form-data: image (file), mask (file, optional), model_id (field)
-
-    Returns the restored PNG directly (binary) for the specified model.
-    """
+    """Restore with a single model. Returns PNG binary."""
     if "image" not in request.files:
         return jsonify({"error": "No image provided"}), 400
     model_id = request.form.get("model_id", "baseline_official")
@@ -342,45 +319,174 @@ def restore_one():
 # v3: Per-upload evaluation (thesis demo)
 # ---------------------------
 
+# @app.route("/api/restore-with-eval", methods=["POST"])
+# def restore_with_eval():
+#     """Restore all models + compute per-upload metrics if ground truth provided."""
+#     import time as _time
+
+#     if "image" not in request.files:
+#         return jsonify({"error": "No image provided"}), 400
+
+#     image_bytes = request.files["image"].read()
+#     mask_bytes = request.files["mask"].read() if "mask" in request.files else None
+#     gt_bytes = (
+#         request.files["ground_truth"].read()
+#         if "ground_truth" in request.files
+#         else None
+#     )
+
+#     has_gt = gt_bytes is not None
+
+#     # Pre-process ground truth if provided (for metric computation)
+#     gt_tensor = None
+#     if has_gt:
+#         from PIL import Image as _PIL
+#         import numpy as _np
+
+#         pil_gt = _PIL.open(io.BytesIO(gt_bytes)).convert("RGB")
+#         pil_gt_resized = pil_gt.resize((512, 512), _PIL.LANCZOS)
+#         gt_arr = _np.array(pil_gt_resized, dtype=_np.float32) / 255.0
+#         gt_tensor = (
+#             torch.from_numpy(gt_arr)
+#             .permute(2, 0, 1)
+#             .unsqueeze(0)
+#             .to(DEVICE)
+#         )
+
+#     results = []
+#     for model_id in sorted(_registry.keys(), key=lambda m: _registry[m].order):
+#         info = _registry[model_id]
+
+#         if not info.available:
+#             results.append({
+#                 "model_id":       model_id,
+#                 "display_name":   info.display_name,
+#                 "available":      False,
+#                 "restored_image_b64": None,
+#                 "error":          "Checkpoint not yet available — training in progress",
+#                 "inference_time_s": None,
+#                 "mask_coverage_pct": None,
+#                 "checkpoint_path": None,
+#                 "checkpoint_metadata": None,
+#                 "official_eval_summary": None,
+#                 "per_upload_metrics": None,
+#             })
+#             continue
+
+#         gen = _generators.get(model_id)
+#         if gen is None:
+#             results.append({
+#                 "model_id":       model_id,
+#                 "display_name":   info.display_name,
+#                 "available":      False,
+#                 "restored_image_b64": None,
+#                 "error":          "Model failed to load at startup",
+#                 "inference_time_s": None,
+#                 "mask_coverage_pct": None,
+#                 "checkpoint_path": None,
+#                 "checkpoint_metadata": None,
+#                 "official_eval_summary": None,
+#                 "per_upload_metrics": None,
+#             })
+#             continue
+
+#         try:
+#             restored_bytes, run_info = run_inference(
+#                 gen, image_bytes, mask_bytes,
+#                 device=DEVICE,
+#                 model_name=model_id,
+#                 checkpoint_path=info.checkpoint_path,
+#                 save_debug=True,
+#             )
+
+#             # Compute per-upload metrics if GT provided
+#             per_upload_metrics = None
+#             if has_gt and gt_tensor is not None:
+#                 try:
+#                     # Re-process the composed output as a tensor for metrics
+#                     from canonical_inference import preprocess_image as _preprocess
+#                     from PIL import Image as _PIL
+#                     import numpy as _np
+
+#                     pil_restored = _PIL.open(io.BytesIO(restored_bytes)).convert("RGB")
+#                     pil_restored_resized = pil_restored.resize((512, 512), _PIL.LANCZOS)
+#                     r_arr = _np.array(pil_restored_resized, dtype=_np.float32) / 255.0
+#                     restored_tensor = (
+#                         torch.from_numpy(r_arr)
+#                         .permute(2, 0, 1)
+#                         .unsqueeze(0)
+#                         .to(DEVICE)
+#                     )
+#                     _, metric_mask_tensor, _ = preprocess_image(image_bytes, mask_bytes, device=DEVICE)
+
+#                     per_upload_metrics = compute_per_upload_metrics(
+#                         restored_tensor,
+#                         gt_tensor,
+#                         DEVICE,
+#                         mask_tensor=metric_mask_tensor,
+#                     )
+#                 except Exception as metric_err:
+#                     print(f"[ARTIFEX] Metric computation failed for {model_id}: {metric_err}")
+#                     per_upload_metrics = {"error": str(metric_err)}
+
+#             eval_summary_dict = (
+#                 info.eval_summary.to_dict() if info.eval_summary else None
+#             )
+
+#             results.append({
+#                 "model_id":         model_id,
+#                 "display_name":     info.display_name,
+#                 "available":        True,
+#                 "restored_image_b64": _bytes_to_b64_png(restored_bytes),
+#                 "error":            None,
+#                 "inference_time_s":  run_info.get("inference_time_s"),
+#                 "mask_coverage_pct": run_info.get("mask_coverage_pct"),
+#                 "checkpoint_path":   info.checkpoint_path,
+#                 "checkpoint_metadata": info.checkpoint_metadata,
+#                 "official_eval_summary": eval_summary_dict,
+#                 "per_upload_metrics": per_upload_metrics,
+#             })
+#         except Exception as e:
+#             results.append({
+#                 "model_id":     model_id,
+#                 "display_name": info.display_name,
+#                 "available":    True,
+#                 "restored_image_b64": None,
+#                 "error":        str(e),
+#                 "inference_time_s": None,
+#                 "mask_coverage_pct": None,
+#                 "checkpoint_path": None,
+#                 "checkpoint_metadata": None,
+#                 "official_eval_summary": None,
+#                 "per_upload_metrics": None,
+#             })
+
+#     # Metric policy message
+#     if has_gt:
+#         policy = (
+#             "Per-upload metrics (PSNR, SSIM, L1, L2, Perceptual, Style) are "
+#             "computed against YOUR provided ground truth for this specific upload. "
+#             "Brushstroke-specific metrics (direction, edge strength, histogram) "
+#             "require pre-extracted feature maps and are available only for "
+#             "official benchmark images."
+#         )
+#     else:
+#         policy = (
+#             "No ground truth provided — per-upload metrics are NOT shown. "
+#             "This is by design: computing PSNR/SSIM without valid ground truth "
+#             "would be misleading. Upload a clean ground-truth image alongside "
+#             "the damaged image to see real per-upload metrics."
+#         )
+
+#     return jsonify({
+#         "has_ground_truth": has_gt,
+#         "results": results,
+#         "metric_policy": policy,
+#     })
+
 @app.route("/api/restore-with-eval", methods=["POST"])
 def restore_with_eval():
-    """
-    POST /api/restore-with-eval
-    Form-data:
-      image        (file, required)  — damaged painting
-      mask         (file, optional)  — damage mask (white=damaged)
-      ground_truth (file, optional)  — clean ground-truth image
-
-    Runs ALL available models on the upload. If ground_truth is provided,
-    computes per-upload metrics (PSNR, SSIM, L1, L2, Perceptual, Style)
-    for EACH model result against the ground truth.
-
-    This is the PRIMARY endpoint for the v3 thesis demo page.
-
-    Returns JSON:
-    {
-      "has_ground_truth": bool,
-      "results": [
-        {
-          "model_id": "baseline_official",
-          "display_name": "...",
-          "available": true/false,
-          "restored_image_b64": "data:image/png;base64,...",
-          "error": null,
-          "inference_time_s": 1.2,
-          "mask_coverage_pct": 15.3,
-          "checkpoint_path": "...",
-          "checkpoint_metadata": {...},
-          "official_eval_summary": {...},
-          "per_upload_metrics": null | {psnr: 15.5, ssim: 0.78, ...}
-        },
-        ...
-      ],
-      "metric_policy": "..."
-    }
-    """
-    import time as _time
-
+    """Restore all models + compute per-upload metrics if ground truth provided."""
     if "image" not in request.files:
         return jsonify({"error": "No image provided"}), 400
 
@@ -394,7 +500,6 @@ def restore_with_eval():
 
     has_gt = gt_bytes is not None
 
-    # Pre-process ground truth if provided (for metric computation)
     gt_tensor = None
     if has_gt:
         from PIL import Image as _PIL
@@ -410,17 +515,30 @@ def restore_with_eval():
             .to(DEVICE)
         )
 
+    metric_mask_tensor = None
+    if has_gt and mask_bytes is not None:
+        try:
+            _, metric_mask_tensor, _ = preprocess_image(
+                image_bytes,
+                mask_bytes,
+                device=DEVICE,
+            )
+        except Exception as mask_err:
+            print(f"[ARTIFEX] Failed to preprocess mask for upload metrics: {mask_err}")
+            metric_mask_tensor = None
+
     results = []
+
     for model_id in sorted(_registry.keys(), key=lambda m: _registry[m].order):
         info = _registry[model_id]
 
         if not info.available:
             results.append({
-                "model_id":       model_id,
-                "display_name":   info.display_name,
-                "available":      False,
+                "model_id": model_id,
+                "display_name": info.display_name,
+                "available": False,
                 "restored_image_b64": None,
-                "error":          "Checkpoint not yet available — training in progress",
+                "error": "Checkpoint not yet available — training in progress",
                 "inference_time_s": None,
                 "mask_coverage_pct": None,
                 "checkpoint_path": None,
@@ -433,11 +551,11 @@ def restore_with_eval():
         gen = _generators.get(model_id)
         if gen is None:
             results.append({
-                "model_id":       model_id,
-                "display_name":   info.display_name,
-                "available":      False,
+                "model_id": model_id,
+                "display_name": info.display_name,
+                "available": False,
                 "restored_image_b64": None,
-                "error":          "Model failed to load at startup",
+                "error": "Model failed to load at startup",
                 "inference_time_s": None,
                 "mask_coverage_pct": None,
                 "checkpoint_path": None,
@@ -449,33 +567,37 @@ def restore_with_eval():
 
         try:
             restored_bytes, run_info = run_inference(
-                gen, image_bytes, mask_bytes,
+                gen,
+                image_bytes,
+                mask_bytes,
                 device=DEVICE,
                 model_name=model_id,
                 checkpoint_path=info.checkpoint_path,
                 save_debug=True,
             )
 
-            # Compute per-upload metrics if GT provided
             per_upload_metrics = None
             if has_gt and gt_tensor is not None:
                 try:
-                    # Re-process the composed output as a tensor for metrics
-                    from canonical_inference import preprocess_image as _preprocess
                     from PIL import Image as _PIL
                     import numpy as _np
 
                     pil_restored = _PIL.open(io.BytesIO(restored_bytes)).convert("RGB")
                     pil_restored_resized = pil_restored.resize((512, 512), _PIL.LANCZOS)
                     r_arr = _np.array(pil_restored_resized, dtype=_np.float32) / 255.0
+
                     restored_tensor = (
                         torch.from_numpy(r_arr)
                         .permute(2, 0, 1)
                         .unsqueeze(0)
                         .to(DEVICE)
                     )
+
                     per_upload_metrics = compute_per_upload_metrics(
-                        restored_tensor, gt_tensor, DEVICE
+                        restored_tensor,
+                        gt_tensor,
+                        DEVICE,
+                        mask_tensor=metric_mask_tensor,
                     )
                 except Exception as metric_err:
                     print(f"[ARTIFEX] Metric computation failed for {model_id}: {metric_err}")
@@ -486,25 +608,25 @@ def restore_with_eval():
             )
 
             results.append({
-                "model_id":         model_id,
-                "display_name":     info.display_name,
-                "available":        True,
+                "model_id": model_id,
+                "display_name": info.display_name,
+                "available": True,
                 "restored_image_b64": _bytes_to_b64_png(restored_bytes),
-                "error":            None,
-                "inference_time_s":  run_info.get("inference_time_s"),
+                "error": None,
+                "inference_time_s": run_info.get("inference_time_s"),
                 "mask_coverage_pct": run_info.get("mask_coverage_pct"),
-                "checkpoint_path":   info.checkpoint_path,
+                "checkpoint_path": info.checkpoint_path,
                 "checkpoint_metadata": info.checkpoint_metadata,
                 "official_eval_summary": eval_summary_dict,
                 "per_upload_metrics": per_upload_metrics,
             })
         except Exception as e:
             results.append({
-                "model_id":     model_id,
+                "model_id": model_id,
                 "display_name": info.display_name,
-                "available":    True,
+                "available": True,
                 "restored_image_b64": None,
-                "error":        str(e),
+                "error": str(e),
                 "inference_time_s": None,
                 "mask_coverage_pct": None,
                 "checkpoint_path": None,
@@ -513,14 +635,11 @@ def restore_with_eval():
                 "per_upload_metrics": None,
             })
 
-    # Metric policy message
     if has_gt:
         policy = (
-            "Per-upload metrics (PSNR, SSIM, L1, L2, Perceptual, Style) are "
-            "computed against YOUR provided ground truth for this specific upload. "
-            "Brushstroke-specific metrics (direction, edge strength, histogram) "
-            "require pre-extracted feature maps and are available only for "
-            "official benchmark images."
+            "Per-upload metrics are computed against your provided ground truth for this specific upload. "
+            "PSNR, SSIM, L1, L2, Perceptual, and Style are full-image metrics. "
+            "Direction, Edge Strength, and Histogram are computed live from the upload using the active mask."
         )
     else:
         policy = (
@@ -535,18 +654,13 @@ def restore_with_eval():
         "results": results,
         "metric_policy": policy,
     })
-
-
 # ---------------------------
 # Benchmark endpoints
 # ---------------------------
 
 @app.route("/api/benchmark/models")
 def benchmark_models():
-    """
-    GET /api/benchmark/models
-    Returns models that have eval data (benchmark-capable).
-    """
+    """Models that have eval data (benchmark-capable)."""
     bm_models = {}
     for mid, info in _registry.items():
         bm_models[mid] = {
@@ -563,10 +677,7 @@ def benchmark_models():
 
 @app.route("/api/benchmark/samples")
 def benchmark_samples():
-    """
-    GET /api/benchmark/samples?page=1&per_page=20
-    Returns a paginated list of benchmark test sample names.
-    """
+    """Paginated list of benchmark test sample names."""
     page = int(request.args.get("page", 1))
     per_page = int(request.args.get("per_page", 20))
     total = len(_benchmark_samples)
@@ -584,14 +695,7 @@ def benchmark_samples():
 
 @app.route("/api/benchmark/sample/<sample_id>")
 def benchmark_sample(sample_id: str):
-    """
-    GET /api/benchmark/sample/<sample_id>
-    Returns damaged, mask, ground-truth, and pre-computed restored images (b64)
-    plus per-image metrics from all models that have them.
-
-    Serving images as b64 avoids CORS and static-file routing complexities.
-    Only the first 4 chars of the base64 are used to validate; full b64 returned.
-    """
+    """All images and per-image metrics for a single benchmark sample."""
     # Sanitise sample_id
     if not sample_id.endswith(".png"):
         sample_id = sample_id + ".png"
@@ -638,10 +742,7 @@ def benchmark_sample(sample_id: str):
 
 @app.route("/api/benchmark/metrics/<model_id>")
 def benchmark_metrics(model_id: str):
-    """
-    GET /api/benchmark/metrics/<model_id>
-    Returns aggregate eval summary + per-image metrics for a model.
-    """
+    """Aggregate eval summary + per-image metrics for a model."""
     info = _registry.get(model_id)
     if info is None:
         return jsonify({"error": f"Unknown model_id: {model_id}"}), 404
@@ -658,10 +759,7 @@ def benchmark_metrics(model_id: str):
 
 @app.route("/api/benchmark/comparison")
 def benchmark_comparison():
-    """
-    GET /api/benchmark/comparison
-    Returns the saved baseline vs full comparison JSON.
-    """
+    """Saved baseline vs full comparison JSON."""
     data = load_comparison_json()
     if data is None:
         return jsonify({"error": "Comparison JSON not yet generated"}), 404

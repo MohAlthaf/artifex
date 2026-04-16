@@ -1,7 +1,9 @@
 # ARTIFEX — Van Gogh Art Restoration Demo
 
 > **Thesis Project Demo (v3)**
-> Single-page research prototype: upload a damaged Van Gogh painting + damage mask + optional clean ground truth. Run it through all available official SGRGAN thesis models. See real per-upload metrics ONLY when ground truth is provided — no fake metrics, ever. Browse official benchmark evidence (305-image test set).
+ARTIFEX is a thesis demonstration system for brushstroke-aware painting restoration. The demo allows a user to upload a damaged painting, an optional damage mask, and an optional clean ground-truth image. The system then runs the image through the available ARTIFEX model variants and displays the restoration outputs.
+
+Per-upload metrics are only shown when a clean ground-truth image is provided. This avoids showing misleading scores when there is no valid reference image for comparison. The demo also includes an official benchmark evidence section based on the fixed 305-image Van Gogh test set.
 
 ---
 
@@ -21,15 +23,17 @@
                             │ HTTP (direct, no Express proxy)
 ┌───────────────────────────▼─────────────────────────────────────┐
 │                Flask ML Service (port 5001)                      │
-│  canonical_inference.py — SGRGANGenerator (exact thesis arch)    │
+│  canonical_inference.py — ArtifexGenerator (exact thesis arch)   │
 │  model_registry.py      — Dynamic checkpoint discovery           │
 │  metrics.py             — Per-upload metric computation           │
 │  app.py                 — Flask endpoints + CORS                  │
 │                                                                  │
 │  Models loaded at startup:                                       │
-│    ✅ baseline_official   (models/baseline_official/)             │
-│    ✅ full_official       (models/full_official/)                 │
-│    ❌ dir/edge/hist ablations — not yet trained                  │
+│     baseline_official   (models/baseline_official/)             │
+│     full_official       (models/full_official/)                 │
+│     dir_only_official   (models/dir_only_15ep_official/)        │
+│     edge_only_official  (models/edge_only_15ep_official/)       │
+│     hist_only_official  (models/hist_only_15ep_official/)       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -56,11 +60,11 @@ Brushstroke-specific metrics (direction, edge strength, histogram) require pre-e
 
 | Model ID             | Status             | Checkpoint                                                    | Eval Results                                          |
 | -------------------- | ------------------ | ------------------------------------------------------------- | ----------------------------------------------------- |
-| `baseline_official`  | ✅ Available       | `models/baseline_official/baseline_official_best.pth` (ep 46) | `results/baseline_ep46/evaluation_results.json`       |
-| `full_official`      | ✅ Available       | `models/full_official/full_official_best.pth` (ep 3)          | `results/full_eval/full_best/evaluation_results.json` |
-| `dir_only_official`  | ❌ Not yet trained | —                                                             | —                                                     |
-| `edge_only_official` | ❌ Not yet trained | —                                                             | —                                                     |
-| `hist_only_official` | ❌ Not yet trained | —                                                             | —                                                     |
+| `baseline_official`  |  Available | `models/baseline_official/baseline_official_best.pth` (ep 46)             | `results/baseline_ep46_v2/evaluation_results.json`                  |
+| `full_official`      |  Available | `models/full_official/full_official_best.pth` (ep 3)                      | `results/full_eval_v2/evaluation_results.json`                      |
+| `dir_only_official`  |  Available | `models/dir_only_15ep_official/dir_only_15ep_official_best.pth` (ep 15)   | `runs/dir_only_15ep_20260312_210744/logs/evaluation_results.json`   |
+| `edge_only_official` | Available | `models/edge_only_15ep_official/edge_only_15ep_official_best.pth` (ep 5)  | `runs/edge_only_15ep_20260313_023647/logs/evaluation_results.json`  |
+| `hist_only_official` |  Available | `models/hist_only_15ep_official/hist_only_15ep_official_best.pth` (ep 5)  | `runs/hist_only_15ep_20260313_101629/logs/evaluation_results.json`  |
 
 ---
 
@@ -78,16 +82,6 @@ pip install torch torchvision flask flask-cors numpy Pillow
 
 cd artifex/client-next && npm install
 ```
-
-### Git hook setup (one-time, per clone)
-
-Enable the repo-local pre-commit hook that auto-updates tracking docs on every commit:
-
-```bash
-git config core.hooksPath .githooks
-```
-
-This will run `scripts/update_task_tracker.py` and `scripts/update_devlog_from_staged_diff.py` before each commit, then stage the updated `docs/IMPLEMENTATION_TASK_TRACKER.md`, `docs/WORK_DONE_SNAPSHOT.md`, and `docs/DEVLOG.md`.
 
 ### Run
 
@@ -139,11 +133,8 @@ PYTHON=~/.pyenv/versions/3.10.9/bin/python3 ./start.sh
 # Terminal 1 — Flask ML Service
 cd server/ml && python3 app.py
 
-# Terminal 2 — Express API
-cd server && npm run dev
-
-# Terminal 3 — React Frontend
-cd client && npm run dev
+# Terminal 2 — Next.js Frontend
+cd client-next && npm run dev
 ```
 
 ---
@@ -152,24 +143,21 @@ cd client && npm run dev
 
 ```
 artifex/
-  start.sh                          Startup script (all three servers)
+  start.sh                          Startup script (Flask + Next.js)
   README.md                         This file
-  SYSTEM_ARCHITECTURE_PROGRESS.md   Changelog and architecture notes
+  test_model.py                     Standalone inference test
 
-  client/src/
-    App.jsx                         Root — two-tab navigation
-    pages/LiveRestorePage.jsx        Upload + multi-model inference
-    pages/BenchmarkExplorerPage.jsx  Test-set browser + comparison table
-    components/ModelResultCard.jsx   Per-model result card with metrics
+  client-next/                      Next.js 15 frontend
+    app/page.jsx                    Single-page thesis demo
+    components/UploadZone.jsx       Drag-and-drop upload
+    components/ModelResultCard.jsx  Per-model result card with metrics
+    components/BenchmarkEvidence.jsx Benchmark evidence section
 
-  server/
-    server.js                       Express proxy
-    ml/
-      app.py                        Flask ML service (canonical)
-      canonical_inference.py        SGRGANGenerator architecture + inference
-      model_registry.py             Dynamic checkpoint discovery
-      app_legacy.py                 Old prototype Flask app (preserved)
-      model_legacy.py               Old prototype model (no skip connections)
+  server/ml/
+    app.py                          Flask ML service (canonical)
+    canonical_inference.py          ArtifexGenerator architecture + inference
+    model_registry.py               Dynamic checkpoint discovery
+    metrics.py                      Per-upload metric computation
 ```
 
 ---
@@ -183,17 +171,19 @@ data/processed/test/
   masks/      305 binary damage masks
 
 results/
-  baseline_ep46/evaluation_results.json        per-image metrics, baseline_official
-  full_eval/full_best/evaluation_results.json  per-image metrics, full_official
-  baseline_vs_full_comparison.json             aggregate comparison (full wins 8/9)
+  baseline_ep46_v2/evaluation_results.json     per-image metrics, baseline_official (authoritative)
+  full_eval_v2/evaluation_results.json         per-image metrics, full_official (authoritative)
+  baseline_vs_full_comparison.json             aggregate comparison
+  final_submission/                            authoritative results package
 ```
 
-**Metric disclaimer:** Metrics in the Live Restore tab are official test-set averages (n=305). They are clearly labelled and are NOT computed per-upload.
+Per-upload metrics (PSNR, SSIM, L1, etc.) are computed only when ground truth is provided. Official test-set averages (n=305) are always shown from saved evaluation JSONs.
 
 ---
 
 ## Tech Stack
 
-- **Frontend:** React 19 + Vite 7
-- **API:** Node.js + Express 4
-- **ML:** Python 3.10 + Flask + PyTorch (CPU; MPS forced off due to MultiheadAttention OOM at 512×512)
+- **Frontend:** Next.js 15 / React 19 (App Router, Tailwind CSS)
+- **ML Backend:** Python 3.10+ / Flask + PyTorch (CPU; MPS forced off due to MultiheadAttention OOM at 512×512)
+- **No proxy layer:** Next.js calls Flask directly via CORS
+

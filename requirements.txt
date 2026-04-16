@@ -1,32 +1,35 @@
 # ARTIFEX — Brushstroke-Aware Deep Inpainting for Van Gogh Restoration
-# Generated from local M2 development environment (.venv, Python 3.13)
+# Verified from the local M2 development environment (Python 3.12.7)
 # Install: pip install -r requirements.txt
 #
-# NOTE: torch/torchvision versions are for macOS MPS (Apple Silicon).
+# NOTE: torch/torchvision versions below are for macOS MPS (Apple Silicon).
 #       For CUDA, install the appropriate torch build from https://pytorch.org/
 
 # Core deep learning
-torch==2.10.0
-torchvision==0.25.0
+torch==2.3.0
+torchvision==0.18.0
 
 # Numerical / scientific
-numpy==2.4.2
-scipy==1.17.1
-scikit-image==0.26.0
-h5py==3.16.0
+numpy==2.2.6
+scipy==1.15.1
+scikit-image==0.25.2
+h5py==3.12.1
 
 # Image handling
-pillow==12.1.1
-imageio==2.37.3
+pillow==11.1.0
+imageio==2.37.2
 
 # Plotting
-matplotlib==3.10.8
+matplotlib==3.10.0
 
 # Evaluation metrics
 lpips==0.1.4
 
 # Progress bars
-tqdm==4.67.3
+tqdm==4.67.1
+
+# Preprocessing (used by scripts/preprocess_dataset.py)
+opencv-python>=4.0
 
 # Server (optional — only needed for client-server demo)
 Flask==3.1.3

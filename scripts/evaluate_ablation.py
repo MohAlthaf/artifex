@@ -1,30 +1,12 @@
 #!/usr/bin/env python3
 """
 ARTIFEX — Ablation Evaluation Pipeline (Generalized)
-=====================================================
-Evaluates both <ablation>_best.pth and checkpoint_epoch_50.pth for any ablation,
-selects the official checkpoint, and creates a comparison against baseline.
+
+Evaluates <ablation>_best.pth and checkpoint_epoch_50.pth, selects the
+official checkpoint, and creates a comparison against baseline.
 
 Usage:
     python3 scripts/evaluate_ablation.py --ablation dir_only --run-dir runs/dir_only_YYYYMMDD_HHMMSS
-
-    # Or with explicit checkpoint paths:
-    python3 scripts/evaluate_ablation.py \
-        --ablation dir_only \
-        --run-dir runs/dir_only_YYYYMMDD_HHMMSS \
-        --best-ckpt runs/dir_only_.../checkpoints/dir_only_best.pth \
-        --final-ckpt runs/dir_only_.../checkpoints/checkpoint_epoch_50.pth
-
-Outputs:
-    results/<ablation>_eval/<ablation>_best/evaluation_results.json
-    results/<ablation>_eval/<ablation>_best/visual_comparison.png
-    results/<ablation>_eval/<ablation>_best/brushstroke_analysis.png
-    results/<ablation>_eval/epoch_50/evaluation_results.json
-    results/<ablation>_eval/epoch_50/visual_comparison.png
-    results/<ablation>_eval/epoch_50/brushstroke_analysis.png
-    models/<ablation>_official/<ablation>_official_best.pth
-    models/<ablation>_official/selection_record.json
-    results/baseline_vs_<ablation>_comparison.json
 """
 
 import os, sys, json, math, shutil, datetime, warnings, argparse
@@ -51,7 +33,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 os.chdir(PROJECT_ROOT)
 sys.path.insert(0, str(PROJECT_ROOT))
 
-NOTEBOOK_PATH = PROJECT_ROOT / 'artifex_FULLY_FIXED_M2_PATHS.ipynb'
+NOTEBOOK_PATH = PROJECT_ROOT / 'artifex_training.ipynb'
 
 # ---- Paths ----
 RUN_DIR = PROJECT_ROOT / args.run_dir

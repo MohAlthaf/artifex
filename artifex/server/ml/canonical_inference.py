@@ -1,24 +1,8 @@
 """
-canonical_inference.py
-======================
-Canonical SGRGAN inference module for the ARTIFEX serving system.
+canonical_inference.py — ARTIFEX generator architecture + inference.
 
-This module contains the *exact* generator architecture from the thesis
-training notebook (artifex_FULLY_FIXED_M2_PATHS.ipynb), including:
-  - BiLevelRoutingAttention  (windowed, MPS-compatible)
-  - SCConv                   (spatial-channel convolution)
-  - BiSCCFormerBlock         (texture encoder block)
-  - FocalModulation          (multi-scale dilated convolution)
-  - FocalBlock               (structure encoder block)
-  - SGRGANGenerator          (dual-stream encoder + attention fusion
-                               + U-Net decoder with skip connections)
-
-This file is intentionally kept separate from the training notebook so that
-the serving system can import a clean, dependency-minimal architecture without
-touching the experiment / training flow.
-
-DO NOT modify the class definitions here without mirroring the change in the
-canonical training notebook — they must stay in sync for checkpoints to load.
+Exact architecture from the thesis notebook, extracted for serving.
+Keep in sync with artifex_training.ipynb for checkpoint compat.
 """
 
 from __future__ import annotations
@@ -38,17 +22,9 @@ from PIL import Image
 # ---------------------------------------------------------------------------
 
 def select_device() -> torch.device:
-    """Choose the best available device for inference.
-
-    CUDA is preferred when available.  On Apple Silicon Macs, MPS is
-    intentionally **not** used because the bi-level routing attention
-    in BiSCCFormer exceeds the MPS intermediate-buffer size limit,
-    causing OOM at 512x512 resolution.  CPU inference takes ~2-4s per
-    image on an M2, which is acceptable for the Flask serving path.
-    """
+    """CUDA if available, else CPU. MPS skipped (attention OOM at 512×512)."""
     if torch.cuda.is_available():
         return torch.device("cuda")
-    # MPS has known attention buffer OOM issues with this architecture
     return torch.device("cpu")
 
 
@@ -57,11 +33,7 @@ def select_device() -> torch.device:
 # ============================================================================
 
 class BiLevelRoutingAttention(nn.Module):
-    """
-    Bi-level routing attention from SGRGAN.
-    Uses **windowed** attention to avoid O(N²) memory explosion.
-    MPS-compatible.
-    """
+    """Windowed bi-level routing attention (avoids O(N²) memory)."""
 
     def __init__(self, dim: int, num_heads: int = 8,
                  qkv_bias: bool = False, topk: int = 8, window_size: int = 8):
@@ -117,7 +89,7 @@ class BiLevelRoutingAttention(nn.Module):
 
 
 class SCConv(nn.Module):
-    """Spatial-Channel Convolution — decomposes spatial and channel ops."""
+    """Depthwise spatial conv + pointwise channel conv."""
 
     def __init__(self, in_channels: int, out_channels: int):
         super().__init__()
@@ -131,10 +103,7 @@ class SCConv(nn.Module):
 
 
 class BiSCCFormerBlock(nn.Module):
-    """
-    BiSCCFormer Block: windowed BiLevelRoutingAttention + SCConv.
-    Used in the texture encoder.
-    """
+    """Attention + SCConv block for the texture encoder."""
 
     def __init__(self, dim: int, num_heads: int = 8, window_size: int = 8):
         super().__init__()
@@ -185,7 +154,7 @@ class FocalModulation(nn.Module):
 
 
 class FocalBlock(nn.Module):
-    """Focal Block for the structure encoder."""
+    """FocalModulation + FFN block for the structure encoder."""
 
     def __init__(self, dim: int):
         super().__init__()
@@ -205,29 +174,16 @@ class FocalBlock(nn.Module):
 
 
 # ============================================================================
-# SGRGANGenerator  (canonical — matches official checkpoint keys)
+# ArtifexGenerator  (canonical — matches official checkpoint keys)
 # ============================================================================
 
-class SGRGANGenerator(nn.Module):
+class ArtifexGenerator(nn.Module):
     """
-    Complete SGRGAN Generator — CANONICAL VERSION.
+    Dual-stream generator: BiSCCFormer (texture) + Focal (structure),
+    attention fusion, U-Net decoder with skip connections.
 
-    Architecture:
-      Texture encoder  : 4 × (Conv + InstanceNorm + LeakyReLU + BiSCCFormerBlock)
-      Structure encoder: 4 × (Conv + InstanceNorm + LeakyReLU + FocalBlock)
-      Fusion           : MultiheadAttention + fusion_conv
-      Decoder          : 4 × ConvTranspose2d with U-Net skip connections
-                         skip_conv1  768 → 256  (dec1 + t3 + s3)
-                         skip_conv2  384 → 128  (dec2 + t2 + s2)
-                         skip_conv3  192 → 64   (dec3 + t1 + s1)
-      Output           : Conv2d → Sigmoid
-
-    Input:
-      x    : (B, 3, H, W)  damaged RGB image
-      mask : (B, 1, H, W)  damage mask  (1 = damaged, 0 = intact)
-
-    Output:
-      (B, 3, H, W)  restored RGB image  (values in [0, 1])
+    Input:  (B,3,H,W) damaged image + (B,1,H,W) mask (1=damaged)
+    Output: (B,3,H,W) restored image in [0,1]
     """
 
     def __init__(self, in_channels: int = 4, out_channels: int = 3):
@@ -376,6 +332,10 @@ class SGRGANGenerator(nn.Module):
         return self.output(d4)
 
 
+# Backward-compat alias (notebook + eval scripts reference SGRGANGenerator by name)
+SGRGANGenerator = ArtifexGenerator
+
+
 # ============================================================================
 # Checkpoint loading
 # ============================================================================
@@ -383,16 +343,8 @@ class SGRGANGenerator(nn.Module):
 def load_generator(
     checkpoint_path: str,
     device: Optional[torch.device] = None,
-) -> SGRGANGenerator:
-    """
-    Load an SGRGANGenerator from an official thesis checkpoint.
-
-    Official checkpoints are full training snapshots; the generator weights
-    live under the 'generator_state_dict' key.
-
-    Returns: generator in eval mode on the specified device.
-    Raises:  FileNotFoundError, RuntimeError (key mismatch)
-    """
+) -> ArtifexGenerator:
+    """Load a generator from an official thesis checkpoint (.pth)."""
     if device is None:
         device = select_device()
 
@@ -410,7 +362,7 @@ def load_generator(
         # Raw state dict
         state_dict = checkpoint
 
-    model = SGRGANGenerator(in_channels=4, out_channels=3)
+    model = ArtifexGenerator(in_channels=4, out_channels=3)
     model.load_state_dict(state_dict, strict=True)
     model.to(device)
     model.eval()
@@ -421,7 +373,7 @@ def load_generator(
 # Preprocessing & postprocessing
 # ============================================================================
 
-TARGET_SIZE = (512, 512)   # Model expects 512×512 input
+TARGET_SIZE = (512, 512)
 
 
 def preprocess_image(
@@ -429,14 +381,7 @@ def preprocess_image(
     mask_bytes: Optional[bytes] = None,
     device: Optional[torch.device] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor, Tuple[int, int]]:
-    """
-    Prepare image and mask for inference.
-
-    Returns:
-        img_tensor  : (1, 3, 512, 512)  RGB in [0, 1]
-        mask_tensor : (1, 1, 512, 512)  damage mask in {0, 1}  (1 = damaged)
-        original_size: (W, H) of the input image before resizing
-    """
+    """Resize image + mask to 512×512 tensors. Returns (img, mask, original_size)."""
     if device is None:
         device = select_device()
 
@@ -477,16 +422,7 @@ def postprocess_image(
     output_tensor: torch.Tensor,
     original_size: Tuple[int, int],
 ) -> bytes:
-    """
-    Convert model output tensor to PNG bytes resized back to original_size.
-
-    Args:
-        output_tensor : (1, 3, H, W) in [0, 1]
-        original_size : (W, H)
-
-    Returns:
-        PNG bytes
-    """
+    """Tensor (1,3,H,W) → PNG bytes, resized to original_size."""
     arr = output_tensor.squeeze(0).permute(1, 2, 0).cpu().detach().numpy()
     arr = (arr * 255).clip(0, 255).astype(np.uint8)
     pil_out = Image.fromarray(arr, mode="RGB")
@@ -498,7 +434,7 @@ def postprocess_image(
 
 
 def _tensor_to_pil(t: torch.Tensor) -> Image.Image:
-    """Convert a (1, C, H, W) or (1, 1, H, W) tensor to PIL for debug saving."""
+    """(1,C,H,W) tensor → PIL Image."""
     arr = t.squeeze(0).cpu().detach().numpy()
     if arr.ndim == 3 and arr.shape[0] in (1, 3):
         arr = arr.transpose(1, 2, 0)  # C,H,W → H,W,C
@@ -527,10 +463,7 @@ def _save_debug_artifacts(
     checkpoint_path: str,
     mask_coverage: float,
 ) -> str:
-    """
-    Save debug images + metadata for one inference request.
-    Returns the debug folder path.
-    """
+    """Save debug images + metadata. Returns the output directory."""
     req_dir = os.path.join(_DEBUG_DIR, request_id)
     os.makedirs(req_dir, exist_ok=True)
 
@@ -556,7 +489,7 @@ def _save_debug_artifacts(
 
 
 def run_inference(
-    model: SGRGANGenerator,
+    model: ArtifexGenerator,
     image_bytes: bytes,
     mask_bytes: Optional[bytes] = None,
     device: Optional[torch.device] = None,
@@ -565,26 +498,10 @@ def run_inference(
     save_debug: bool = True,
 ) -> Tuple[bytes, dict]:
     """
-    End-to-end inference: bytes → model → PNG bytes.
+    Full inference pipeline: raw bytes → model → composed PNG bytes.
 
-    Applies the canonical composition step:
-        composed = corrupted * (1 - mask) + restored * mask
-    This ensures intact regions retain the original pixels and the model
-    output is used only inside the damaged mask.  This exactly matches the
-    training-time composition used during GAN training.
-
-    Args:
-        model           : loaded SGRGANGenerator in eval mode
-        image_bytes     : raw bytes of uploaded image
-        mask_bytes      : raw bytes of mask image (optional)
-        device          : torch device (inferred if None)
-        model_name      : human-readable model name (for debug)
-        checkpoint_path  : path to the checkpoint file (for debug)
-        save_debug      : whether to save debug artifacts
-
-    Returns:
-        (png_bytes, info_dict)  where info_dict has:
-            inference_time_s, mask_coverage_pct, debug_dir
+    Composition: keep intact pixels, fill damaged region with model output.
+    Returns (png_bytes, {inference_time_s, mask_coverage_pct, debug_dir}).
     """
     import time as _time
 

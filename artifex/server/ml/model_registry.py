@@ -1,16 +1,8 @@
 """
-model_registry.py
-=================
-Official thesis model registry for the ARTIFEX serving system.
+model_registry.py — Official thesis model registry.
 
-Responsibilities:
-  1. Declare the full *intended* set of official models.
-  2. Dynamically detect which checkpoints actually exist on disk.
-  3. Load checkpoint metadata (epoch, val_loss, config) from checkpoint files.
-  4. Load evaluation summaries from saved evaluation JSON files.
-  5. Expose a clean ModelInfo dataclass to the rest of the application.
-
-No model weights are loaded here — weight loading is done lazily in app.py.
+Declares the intended models, checks checkpoint existence on disk,
+loads metadata + eval summaries. No weights are loaded here.
 """
 
 from __future__ import annotations
@@ -51,7 +43,7 @@ COMPARISON_JSON = os.path.join(THESIS_ROOT, "results", "baseline_vs_full_compari
 # checkpoint existence and mark unavailable models explicitly.
 _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
     "baseline_official": {
-        "display_name":   "Baseline SGRGAN",
+        "display_name":   "Baseline ARTIFEX",
         "description":    "Baseline model — no brushstroke losses. "
                           "Trained for 60 epochs; best checkpoint at epoch 46.",
         "ablation_losses": [],
@@ -69,7 +61,7 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
         "order": 1,
     },
     "full_official": {
-        "display_name":   "Full SGRGAN",
+        "display_name":   "Full ARTIFEX",
         "description":    "Full model — all brushstroke losses active "
                           "(direction + edge strength + histogram). "
                           "Best checkpoint at epoch 3.",
@@ -90,7 +82,7 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
         "order": 2,
     },
     "dir_only_official": {
-        "display_name":   "Direction-Only SGRGAN",
+        "display_name":   "Direction-Only ARTIFEX",
         "description":    "Ablation — direction loss only (λ_direction=2.0). "
                           "15-epoch short suite; best at epoch 15.",
         "ablation_losses": ["direction"],
@@ -102,16 +94,15 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
             THESIS_ROOT, "models", "dir_only_15ep_official", "selection_record.json"
         ),
         "eval_json": os.path.join(
-            THESIS_ROOT, "results", "ablation_15ep_comparison.json",
-            
+            THESIS_ROOT, "runs", "dir_only_15ep_20260312_210744",
+            "logs", "evaluation_results.json",
         ),
-        # /Users/althafali/Downloads/ARTIFEX/implementation/results/ablation_15ep_comparison.json
         "restored_images_dir": None,
         "order": 3,
     },
     "edge_only_official": {
-        "display_name":   "Edge-Only SGRGAN",
-        "description":    "Ablation — edge-strength loss only (λ_edge=2.0). "
+        "display_name":   "Edge-Only ARTIFEX",
+        "description":    "Ablation — edge-strength loss only (λ_thickness=1.0). "
                           "15-epoch short suite; best at epoch 5.",
         "ablation_losses": ["edge_strength"],
         "checkpoint_path": os.path.join(
@@ -122,13 +113,14 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
             THESIS_ROOT, "models", "edge_only_15ep_official", "selection_record.json"
         ),
         "eval_json": os.path.join(
-            THESIS_ROOT, "results", "ablation_15ep_comparison.json",
+            THESIS_ROOT, "runs", "edge_only_15ep_20260313_023647",
+            "logs", "evaluation_results.json",
         ),
         "restored_images_dir": None,
         "order": 4,
     },
     "hist_only_official": {
-        "display_name":   "Histogram-Only SGRGAN",
+        "display_name":   "Histogram-Only ARTIFEX",
         "description":    "Ablation — histogram loss only (λ_hist=2.0). "
                           "15-epoch short suite; best at epoch 5.",
         "ablation_losses": ["histogram"],
@@ -140,7 +132,8 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
             THESIS_ROOT, "models", "hist_only_15ep_official", "selection_record.json"
         ),
         "eval_json": os.path.join(
-            THESIS_ROOT, "results", "ablation_15ep_comparison.json",
+            THESIS_ROOT, "runs", "hist_only_15ep_20260313_101629",
+            "logs", "evaluation_results.json",
         ),
         "restored_images_dir": None,
         "order": 5,
@@ -154,7 +147,7 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
 
 @dataclass
 class EvalSummary:
-    """Aggregate evaluation metrics for a model over the official test set."""
+    """Aggregate evaluation metrics over the official test set."""
     num_images: int = 0
     avg_psnr: Optional[float] = None
     avg_ssim: Optional[float] = None
@@ -180,7 +173,7 @@ class EvalSummary:
 
 @dataclass
 class ModelInfo:
-    """Complete information about one official model."""
+    """All metadata for one official model."""
     model_id: str
     display_name: str
     description: str
@@ -221,10 +214,7 @@ class ModelInfo:
 # ---------------------------------------------------------------------------
 
 def _load_checkpoint_metadata(checkpoint_path: str) -> Dict[str, Any]:
-    """
-    Load lightweight metadata from a checkpoint without loading model weights.
-    Returns a dict with epoch, val_loss, config, model_type etc.
-    """
+    """Read epoch/val_loss/config from checkpoint without loading weights."""
     import torch
     try:
         ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
@@ -240,7 +230,7 @@ def _load_checkpoint_metadata(checkpoint_path: str) -> Dict[str, Any]:
 
 
 def _load_eval_summary(eval_json_path: Optional[str]) -> Optional[EvalSummary]:
-    """Parse the evaluation JSON produced by evaluate_full_model.py."""
+    """Parse evaluation JSON into an EvalSummary."""
     if eval_json_path is None or not os.path.isfile(eval_json_path):
         return None
     try:
@@ -265,6 +255,7 @@ def _load_eval_summary(eval_json_path: Optional[str]) -> Optional[EvalSummary]:
             std_psnr=_safe(data.get("std_psnr")),
             avg_ssim=_safe(data.get("avg_ssim")),
             std_ssim=_safe(data.get("std_ssim")),
+            avg_lpips=_safe(data.get("avg_lpips")),
             avg_l1=_safe(data.get("avg_l1")),
             avg_l2=_safe(data.get("avg_l2")),
             avg_direction=_safe(data.get("avg_direction")),
@@ -288,13 +279,7 @@ def _has_restored_images(restored_dir: Optional[str]) -> bool:
 # ---------------------------------------------------------------------------
 
 def build_registry() -> Dict[str, ModelInfo]:
-    """
-    Build and return the full model registry.
-
-    Checkpoint existence is checked at call time.  Metadata and eval summaries
-    are loaded lazily only for models whose checkpoints exist.
-    This is called once at Flask startup and again on /api/models.
-    """
+    """Build the model registry. Called once at startup."""
     registry: Dict[str, ModelInfo] = {}
     for model_id, cfg in sorted(_REGISTRY_CONFIG.items(),
                                 key=lambda x: x[1]["order"]):
@@ -339,7 +324,7 @@ def build_registry() -> Dict[str, ModelInfo]:
 
 
 def get_available_model_ids(registry: Dict[str, ModelInfo]) -> list:
-    """Return model_ids that are available (checkpoint exists), ordered."""
+    """Model IDs with available checkpoints, in display order."""
     return [
         m.model_id
         for m in sorted(registry.values(), key=lambda x: x.order)
@@ -348,7 +333,7 @@ def get_available_model_ids(registry: Dict[str, ModelInfo]) -> list:
 
 
 def load_comparison_json() -> Optional[Dict[str, Any]]:
-    """Load the baseline vs full comparison JSON if it exists."""
+    """Load baseline vs full comparison JSON, sanitising NaN → null."""
     if not os.path.isfile(COMPARISON_JSON):
         return None
     try:

@@ -1,27 +1,13 @@
 #!/usr/bin/env python3
 """
 ARTIFEX — Full Model Evaluation Pipeline
-=========================================
-Evaluates both full_best.pth and checkpoint_epoch_50.pth on the test set,
-selects the official full checkpoint, and creates the baseline-vs-full comparison.
 
-This script extracts the necessary code from the canonical notebook
-(artifex_FULLY_FIXED_M2_PATHS.ipynb) to ensure consistency, then runs
-the evaluation pipeline.
+Evaluates full_best.pth and checkpoint_epoch_50.pth on the test set,
+selects the official full checkpoint, and creates the baseline-vs-full comparison.
+Extracts code from the canonical notebook for consistency.
 
 Usage:
     python3 scripts/evaluate_full_model.py
-
-Outputs:
-    results/full_eval/full_best/evaluation_results.json
-    results/full_eval/full_best/visual_comparison.png
-    results/full_eval/full_best/brushstroke_analysis.png
-    results/full_eval/epoch_50/evaluation_results.json
-    results/full_eval/epoch_50/visual_comparison.png
-    results/full_eval/epoch_50/brushstroke_analysis.png
-    models/full_official/full_official_best.pth
-    models/full_official/selection_record.json
-    results/baseline_vs_full_comparison.json
 """
 
 import os, sys, json, math, shutil, datetime, warnings
@@ -35,13 +21,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 os.chdir(PROJECT_ROOT)
 sys.path.insert(0, str(PROJECT_ROOT))
 
-NOTEBOOK_PATH = PROJECT_ROOT / 'artifex_FULLY_FIXED_M2_PATHS.ipynb'
+NOTEBOOK_PATH = PROJECT_ROOT / 'artifex_training.ipynb'
 
 # ---- Paths ----
 FULL_RUN_DIR = PROJECT_ROOT / 'runs' / 'full_20260302_070353'
 FULL_BEST_CKPT = FULL_RUN_DIR / 'checkpoints' / 'full_best.pth'
 FULL_EP50_CKPT = FULL_RUN_DIR / 'checkpoints' / 'checkpoint_epoch_50.pth'
-BASELINE_EVAL_JSON = PROJECT_ROOT / 'results' / 'baseline_ep46' / 'evaluation_results.json'
+BASELINE_EVAL_JSON = PROJECT_ROOT / 'results' / 'baseline_ep46_v2' / 'evaluation_results.json'
 BASELINE_OFFICIAL_CKPT = PROJECT_ROOT / 'models' / 'baseline_official' / 'baseline_official_best.pth'
 
 # Output directories

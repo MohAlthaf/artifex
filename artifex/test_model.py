@@ -1,13 +1,12 @@
 """
-Test script for full_best.pth — SGRGAN Van Gogh Art Restoration Model
-=====================================================================
-Loads the checkpoint, runs inference on damaged paintings with their
-corresponding masks, and saves restored results.
+Test script for full_best.pth — ARTIFEX Van Gogh Art Restoration Model
+
+Loads checkpoint, runs inference on damaged paintings with masks, saves results.
 
 Usage:
-    python test_model.py                              # restore all damaged paintings
+    python test_model.py
     python test_model.py --image path/to/damaged.png --mask path/to/mask.png
-    python test_model.py --no-save                    # display only, don't save
+    python test_model.py --no-save
 """
 
 import argparse
@@ -21,16 +20,16 @@ import torch.nn.functional as F
 from PIL import Image, ImageDraw, ImageFont
 
 # ---------------------------------------------------------------------------
-# Import model architecture from server/ml/model.py
+# Import model architecture from server/ml/canonical_inference.py
 # ---------------------------------------------------------------------------
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "server", "ml"))
-from model import SGRGANGenerator  # noqa: E402
+from canonical_inference import ArtifexGenerator  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CHECKPOINT_PATH = os.path.join(SCRIPT_DIR, "full_best.pth")
+CHECKPOINT_PATH = os.path.join(SCRIPT_DIR, "..", "models", "full_official", "full_official_best.pth")
 DAMAGED_DIR = os.path.join(SCRIPT_DIR, "damage paintng")
 MASKS_DIR = os.path.join(SCRIPT_DIR, "damage paintng", "masks")
 OUTPUT_DIR = os.path.join(SCRIPT_DIR, "test_outputs")
@@ -65,7 +64,7 @@ def load_checkpoint(path, device):
     else:
         print("  Checkpoint is a raw state_dict (no metadata)")
 
-    model = SGRGANGenerator(in_channels=4, out_channels=3)
+    model = ArtifexGenerator(in_channels=4, out_channels=3)
     if isinstance(checkpoint, dict) and "generator_state_dict" in checkpoint:
         model.load_state_dict(checkpoint["generator_state_dict"])
     elif isinstance(checkpoint, dict) and "state_dict" in checkpoint:

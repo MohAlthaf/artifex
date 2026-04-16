@@ -1,9 +1,9 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "ARTIFEX — Van Gogh Art Restoration",
+  title: "ARTIFEX | Van Gogh Art Restoration",
   description:
-    "Thesis demo: SGRGAN-based painting restoration with official evaluation metrics",
+    "ARTIFEX thesis demo for brushstroke-aware painting restoration with official evaluation metrics.",
 };
 
 export default function RootLayout({ children }) {
