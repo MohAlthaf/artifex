@@ -16,6 +16,11 @@ __pycache__/
 *.pyo
 .ipynb_checkpoints/
 
+# ---- Temp/debug artifacts ----
+debug_artifacts_*/
+_tmp_*.py
+_apply_repairs*.py
+
 # ---- macOS ----
 .DS_Store
 ._*
@@ -23,3 +28,8 @@ __pycache__/
 # ---- IDE ----
 .vscode/
 .idea/
+
+node_modules/
+
+*.png
+

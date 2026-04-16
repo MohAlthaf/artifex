@@ -1,0 +1,230 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   ARTIFEX — Van Gogh Art Restoration Theme
+   Premium dark theme with golden accents, ported to Tailwind v4
+   ============================================================================ */
+
+@theme {
+  /* Van Gogh inspired palette */
+  --color-gold: #D4AF37;
+  --color-gold-light: #F4E5B2;
+  --color-gold-dark: #AA8C2C;
+  --color-starry-blue: #1E3A5F;
+  --color-night-blue: #0F1C2E;
+  --color-deep-navy: #0A1628;
+  --color-wheat: #F5DEB3;
+  --color-sunflower: #FFD700;
+  --color-success: #10B981;
+  --color-error: #EF4444;
+  --color-warning: #F59E0B;
+
+  /* Fonts */
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ---- Base ---- */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: linear-gradient(
+    135deg,
+    var(--color-deep-navy) 0%,
+    var(--color-night-blue) 50%,
+    var(--color-starry-blue) 100%
+  );
+  color: #f7f8fa;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Glass morphism ---- */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ---- Gold gradient text ---- */
+.text-gradient-gold {
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    var(--color-gold-light) 50%,
+    var(--color-gold) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ---- Gold glow shadow ---- */
+.shadow-gold-glow {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 0 30px rgba(212, 175, 55, 0.3);
+}
+
+/* ---- Primary button ---- */
+.btn-primary {
+  background: linear-gradient(
+    135deg,
+    var(--color-gold) 0%,
+    var(--color-gold-dark) 100%
+  );
+  color: var(--color-deep-navy);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 0 30px rgba(212, 175, 55, 0.3);
+  transition: all 300ms ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2), 0 0 40px rgba(212, 175, 55, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---- Secondary button ---- */
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  transition: all 300ms ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--color-gold);
+}
+
+/* ---- Spinner ---- */
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(212, 175, 55, 0.2);
+  border-top-color: var(--color-gold);
+  border-radius: 9999px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- Upload zone ---- */
+.upload-zone {
+  border: 2px dashed rgba(212, 175, 55, 0.4);
+  transition: all 300ms ease;
+}
+
+.upload-zone:hover {
+  border-color: var(--color-gold);
+  background: rgba(212, 175, 55, 0.05);
+}
+
+.upload-zone.dragging {
+  border-color: var(--color-gold);
+  background: rgba(212, 175, 55, 0.1);
+  transform: scale(1.02);
+}
+
+/* ---- Hero background effect ---- */
+.hero-bg::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(
+      circle at 30% 40%,
+      rgba(212, 175, 55, 0.15) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 70% 60%,
+      rgba(30, 58, 95, 0.3) 0%,
+      transparent 50%
+    );
+  animation: slowRotate 60s linear infinite;
+}
+
+@keyframes slowRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- Fade in animation ---- */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.6s ease forwards;
+}
+
+/* ---- Custom scrollbar ---- */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.3);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.5);
+}
+
+/* ---- Metric badge ---- */
+.metric-badge {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(212, 175, 55, 0.15);
+}
+
+/* ---- Table styles ---- */
+.comparison-table th {
+  padding: 8px 12px;
+  text-align: center;
+  color: #d1d5db;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.comparison-table td {
+  padding: 6px 12px;
+  text-align: center;
+  color: #e8ebf0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
