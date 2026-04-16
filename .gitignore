@@ -4,7 +4,7 @@ runs/
 data/
 datasets/
 baseline_*/
-
+debug_artifacts/
 # ---- Large files ----
 brushstroke_features.h5
 *.h5
