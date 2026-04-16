@@ -55,7 +55,7 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
             THESIS_ROOT, "models", "baseline_official", "selection_record.json"
         ),
         "eval_json": os.path.join(
-            THESIS_ROOT, "results", "baseline_ep46_v2", "evaluation_results.json"
+            THESIS_ROOT, "results", "final_submission", "baseline_evaluation.json"
         ),
         "restored_images_dir": None,   # Not pre-computed
         "order": 1,
@@ -73,8 +73,7 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
             THESIS_ROOT, "models", "full_official", "selection_record.json"
         ),
         "eval_json": os.path.join(
-            THESIS_ROOT, "results", "full_eval_v2",
-            "evaluation_results.json",
+            THESIS_ROOT, "results", "final_submission", "full_evaluation.json"
         ),
         "restored_images_dir": os.path.join(
             THESIS_ROOT, "results", "full_eval", "full_best", "restored_images"
@@ -94,9 +93,9 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
             THESIS_ROOT, "models", "dir_only_15ep_official", "selection_record.json"
         ),
         "eval_json": os.path.join(
-            THESIS_ROOT, "runs", "dir_only_15ep_20260312_210744",
-            "logs", "evaluation_results.json",
+            THESIS_ROOT, "results", "final_submission", "ablation_15ep_comparison.json"
         ),
+        "eval_json_key": "dir_only_15ep",
         "restored_images_dir": None,
         "order": 3,
     },
@@ -113,9 +112,9 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
             THESIS_ROOT, "models", "edge_only_15ep_official", "selection_record.json"
         ),
         "eval_json": os.path.join(
-            THESIS_ROOT, "runs", "edge_only_15ep_20260313_023647",
-            "logs", "evaluation_results.json",
+            THESIS_ROOT, "results", "final_submission", "ablation_15ep_comparison.json"
         ),
+        "eval_json_key": "edge_only_15ep",
         "restored_images_dir": None,
         "order": 4,
     },
@@ -132,9 +131,9 @@ _REGISTRY_CONFIG: Dict[str, Dict[str, Any]] = {
             THESIS_ROOT, "models", "hist_only_15ep_official", "selection_record.json"
         ),
         "eval_json": os.path.join(
-            THESIS_ROOT, "runs", "hist_only_15ep_20260313_101629",
-            "logs", "evaluation_results.json",
+            THESIS_ROOT, "results", "final_submission", "ablation_15ep_comparison.json"
         ),
+        "eval_json_key": "hist_only_15ep",
         "restored_images_dir": None,
         "order": 5,
     },
@@ -229,13 +228,16 @@ def _load_checkpoint_metadata(checkpoint_path: str) -> Dict[str, Any]:
         return {"load_error": str(e)}
 
 
-def _load_eval_summary(eval_json_path: Optional[str]) -> Optional[EvalSummary]:
+def _load_eval_summary(eval_json_path: Optional[str], eval_json_key: Optional[str] = None) -> Optional[EvalSummary]:
     """Parse evaluation JSON into an EvalSummary."""
     if eval_json_path is None or not os.path.isfile(eval_json_path):
         return None
     try:
         with open(eval_json_path, "r") as f:
             data: Dict[str, Any] = json.load(f)
+            
+        if eval_json_key and "models" in data and eval_json_key in data["models"]:
+            data = data["models"][eval_json_key]
 
         def _safe(val: Any) -> Optional[float]:
             if val is None:
@@ -293,7 +295,7 @@ def build_registry() -> Dict[str, ModelInfo]:
 
         if available:
             meta = _load_checkpoint_metadata(ckpt_path)
-            eval_summary = _load_eval_summary(cfg.get("eval_json"))
+            eval_summary = _load_eval_summary(cfg.get("eval_json"), cfg.get("eval_json_key"))
             has_eval = eval_summary is not None
 
         # Determine status

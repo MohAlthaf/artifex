@@ -313,7 +313,9 @@ export default function ModelResultCard({
 
       {available && restored_image_b64 && (
         <div className="flex gap-3 flex-wrap text-[11px] text-gray-400 bg-black/20 px-3 py-2 rounded-lg">
-          {inference_time_s != null && <span>Inference: {inference_time_s}s</span>}
+          {inference_time_s != null && (
+            <span>Inference: {inference_time_s}s</span>
+          )}
           {mask_coverage_pct != null && (
             <span>Mask: {mask_coverage_pct.toFixed(1)}%</span>
           )}
