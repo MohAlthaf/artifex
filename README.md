@@ -1,4 +1,6 @@
-# ARTIFEX: Brushstroke-Aware Deep Inpainting for Painting Restoration
+# ARTIFEX: Brushstroke-Aware Deep Inpainting with Custom Stroke-Fidelity Measures
+
+for Painting Restoration
 
 ## 1. Project Overview
 
